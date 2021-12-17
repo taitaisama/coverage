@@ -594,6 +594,24 @@ struct Bin(T)
     }
 };
 
+string makeArray(size_t len){
+    string s = "uint ";
+    for(int i = 0; i < len; i++){
+        s ~= "[]"; 
+    }
+    s ~= " _hits;";
+    return s;
+}
+
+struct Cross ( N... ){
+    enum size_t len = N.length;
+    mixin(makeArray(len)); 
+    void test(){
+        import std.stdio;
+        writeln(typeof(_hits));
+    }
+}
+
 struct CoverPoint(alias t, string BINS="") {
     import std.traits: isIntegral;
     //import esdl.data.bvec: isBitVector;
@@ -740,6 +758,13 @@ struct CoverPoint(alias t, string BINS="") {
             }
             s ~= "\n";
             return s;
+        }
+        void sample( T val ){
+            foreach(bin;_bins){
+                if(bin.checkHit(val)){
+                    bin._hits++;
+                }
+            } 
         }
 }
 
@@ -888,7 +913,6 @@ private template countIntElements(G, int COUNT=0, int I=0) {
     }
 }
 void main (){
-
 }
 unittest {
     int p;
