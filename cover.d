@@ -7,6 +7,7 @@
 // Authors:   Puneet Goel <puneet@coverify.com>
 
 module esdl.rand.cover;
+import std.stdio;
 // Coverage
 //import esdl.rand.misc;
 
@@ -594,7 +595,42 @@ struct Bin(T)
     }
 };
 
-struct CoverPoint(alias t, string BINS="") {
+string makeArray(size_t len){
+    string s = "uint ";
+    for(int i = 0; i < len; i++){
+        s ~= "[]"; 
+    }
+    s ~= " _hits;";
+    return s;
+}
+
+
+struct Cross ( N... ){
+    enum size_t len = N.length;
+    mixin(makeArray(len));
+    coverInterface [] coverPoints;
+    void doStuff (){
+        import std.traits: isIntegral;
+        foreach (i , elem; N){
+            static if (is (typeof(elem): coverInterface)){
+                coverPoints ~= elem;
+            }
+            else {
+                auto tmp = new CoverPoint!(elem)();
+                coverPoints ~= tmp;
+            }
+        }
+    }
+    void sample(){
+
+    }
+}
+
+interface coverInterface {
+
+}
+
+class CoverPoint(alias t, string BINS="") : coverInterface{
     import std.traits: isIntegral;
     //import esdl.data.bvec: isBitVector;
     alias T = typeof(t);
@@ -604,6 +640,21 @@ struct CoverPoint(alias t, string BINS="") {
     T* _point; // = &t;
     //char[] outBuffer;
     string outBuffer;
+    this (){
+
+        import std.stdio;
+        static if (BINS != ""){
+            mixin(doParse!T(BINS));
+        }
+        else {
+            import std.conv;
+            mixin(doParse!T("bins [32] a = {[" ~ T.min.to!string() ~ ":" ~ T.max.to!string() ~ "]};"));
+        }
+        writeln(doParse!T(BINS));
+
+        procDyanamicBins();
+        procStaticBins();
+    }
     // the number of bins and which one is hit is made out by the
     // sample function
     size_t [] _sbinsNum;
@@ -719,28 +770,21 @@ struct CoverPoint(alias t, string BINS="") {
         _sbinsNum.length = 0;
     }
 
-        void doStuff(){
-            import std.stdio;
-            static if (BINS != ""){
-                mixin(doParse!T(BINS));
-            }
-            else {
-                import std.conv;
-                mixin(doParse!T("bins [32] a = {[" ~ T.min.to!string() ~ ":" ~ T.max.to!string() ~ "]};"));
-            }
-            writeln(doParse!T(BINS));
-
-            procDyanamicBins();
-            procStaticBins();
+    string describe(){
+        string s = "";
+        foreach(bin; _bins){
+            s ~= bin.describe();
         }
-        string describe(){
-            string s = "";
-            foreach(bin; _bins){
-                s ~= bin.describe();
+        s ~= "\n";
+        return s;
+    }
+    void sample(){
+        foreach(bin;_bins){
+            if(bin.checkHit(t)){
+                bin._hits++;
             }
-            s ~= "\n";
-            return s;
-        }
+        } 
+    }
 }
 
 /*class CoverGroup: rand.disable {		// Base Class
@@ -888,15 +932,13 @@ private template countIntElements(G, int COUNT=0, int I=0) {
     }
 }
 void main (){
-
 }
 unittest {
     int p;
-    auto x = CoverPoint!(p, q{
+    auto x = new CoverPoint!(p, q{
             bins a = {     1 , 2 }  ;
 
             })();
-    x.doStuff();
     import std.stdio;
     writeln(x.describe());
     //x.print();
@@ -905,7 +947,7 @@ unittest {
 }
 unittest {
     int p;
-    auto x = CoverPoint!(p, q{
+    auto x = new CoverPoint!(p, q{
             bins a = { [0:63],65 };
             bins [] b = { [127:130],[137:147],200,[100:108] }; // note overlapping values
             bins [3]c = { 200,201,202,204 };
@@ -913,7 +955,6 @@ unittest {
             bins e = { 125 };
             //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
             })();
-    x.doStuff();
     import std.stdio;
     writeln(x.describe());
     //import std.stdio;
@@ -921,10 +962,20 @@ unittest {
 }
 unittest {
     int p;
-    auto x = CoverPoint!(p, q{
+    auto x = new CoverPoint!(p, q{
             bins [32] a = {[-2147483647:2147483647]};
             })();
-    x.doStuff();
     import std.stdio;
     writeln(x.describe());
+}
+unittest{
+    int a,b,c,d;
+    auto cp = new CoverPoint!(d,q{
+            bins [32] a = {[-2147483647:2147483647]};
+            })();
+    auto x = Cross!(a,b,c,cp)();
+    x.doStuff();
+    foreach(elem; x.coverPoints){
+        writeln(typeof(elem).stringof);
+    } 
 }
