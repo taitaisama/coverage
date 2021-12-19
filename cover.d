@@ -624,22 +624,46 @@ class Cross ( N... ): coverInterface{
   override void sample(){
     
   }
+  override double get_coverage(){
+
+  }
+  override double get_inst_coverage(){
+
+  }
+  override void start(){
+
+  }
+  override void stop(){
+    
+  }
+  override bool [] get_inst_hits(){
+    assert(false);
+  }
 }
 
 interface coverInterface {
   void sample ();
+  double get_coverage();
+  double get_inst_coverage();
+  void start();
+  void stop();
+  bool [] get_inst_hits();
+  //double query();
+  //double inst_query();
 }
 
 class CoverPoint(alias t, string BINS="") : coverInterface{
   import std.traits: isIntegral;
   //import esdl.data.bvec: isBitVector;
   alias T = typeof(t);
+  
   static assert(isIntegral!T || isBitVector!T || is(T: bool),
 		"Only integral, bitvec, or bool values can be covered."
 		~ " Unable to cover a value of type: " ~ T.stringof);
   T* _point; // = &t;
   //char[] outBuffer;
   string outBuffer;
+  bool [] _inst_hits;
   this (){
 
     import std.stdio;
@@ -784,6 +808,21 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
 	bin._hits++;
       }
     } 
+  }
+  override double get_coverage(){
+
+  }
+  override double get_inst_coverage(){
+
+  }
+  override void start(){
+
+  }
+  override void stop(){
+    
+  }
+  override bool [] get_inst_hits(){
+    return _inst_hits;
   }
 }
 
