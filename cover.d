@@ -629,24 +629,40 @@ string crossSampleHelper(int n){
   return s;
 }
 
-string arrayInitialising(int n, ulong [] bincnts) (string name){
+string arrayInitialising(int n) (string name){
   import std.conv;
   string s,tmp = name;
+  s ~= name ~ ".length = bincnts[0];\n";
   for(int i = 0; i < n; i++){
-    s ~= tmp ~ ".length = " ~ bincnts[i].to!string() ~ ";\n";
-    tmp ~= "[" ~ i.to!string() ~ "]";
+    s ~= "for(int i_" ~ (i).to!string() ~ " = 0; i_" ~ (i).to!string() ~ " < bincnts[" ~ (i).to!string() ~ "]; i_" ~ (i).to!string() ~ "++){\n";
+    tmp ~= "[i_" ~ (i).to!string() ~ "]";
+    if(i < n - 1)
+      s ~= tmp ~ ".length = bincnts[" ~ (i + 1).to!string() ~"];\n";
+    else 
+      s ~= tmp ~ "= 0;\n";
+  }
+  for(int i = 0; i < n; i++)
+    s ~= "}\n";
+  return s;
+}
+
+string sampleCoverpoints(int n) (){
+  import std.conv;
+  string s;
+  for(int i = 0; i < n; i++){
+    s ~= "coverPoints[" ~ i.to!string() ~ "].sample();\n";
   }
   return s;
 }
 
 class Cross ( N... ): coverInterface{
   enum size_t len = N.length;
+  ulong [] bincnts;
   mixin(makeArray(len, "uint", "_hits"));
   mixin(makeArray(len, "bool", "_inst_hits"));
   coverInterface [] coverPoints;
   this (){
     import std.traits: isIntegral;
-    ulong [] bincnts;
     foreach (i , elem; N){
       static if (is (typeof(elem): coverInterface)){
         coverPoints ~= elem;
@@ -658,10 +674,12 @@ class Cross ( N... ): coverInterface{
         bincnts ~= tmp.getBins().length;
       }
     }
-    /* mixin(arrayInitialising!(len, bincnts)("_hits")); */
-    /* mixin(arrayInitialising!(len, bincnts)("_inst_hits")); */
+    mixin(arrayInitialising!(len)("_hits"));
+    mixin(arrayInitialising!(len)("_inst_hits"));
   }
   override void sample(){
+    mixin(arrayInitialising!(len)("_inst_hits"));
+    mixin(sampleCoverpoints!(len)());
     mixin(crossSampleHelper(N.length));
   }
   override double get_coverage(){
@@ -680,6 +698,9 @@ class Cross ( N... ): coverInterface{
   }
   override bool [] get_inst_hits(){
     assert(false);
+  }
+  auto get_cross_inst_hits(){
+    return _inst_hits;
   }
 }
 
@@ -720,6 +741,7 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
 
     procDyanamicBins();
     procStaticBins();
+    _inst_hits.length = _bins.length; 
   }
   // the number of bins and which one is hit is made out by the
   // sample function
@@ -847,9 +869,12 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
     return s;
   }
   override void sample(){
-    foreach(bin;_bins){
+    for(int i = 0; i < _inst_hits.length; i ++)
+      _inst_hits[i] = false;
+    foreach(i,bin;_bins){
       if(bin.checkHit(t)){
         bin._hits++;
+        _inst_hits[i] = true; 
       }
     } 
   }
@@ -1019,6 +1044,7 @@ void main (){
   /* int [] tmp; */
   /* tmp ~= 1;tmp ~= 5; */
   /* writeln(arrayInitialising(2,"hello", tmp)); */
+  /* writeln(arrayInitialising!(4)("_hits")); */
 }
 unittest {
   int p;
@@ -1056,7 +1082,7 @@ unittest {
   /* writeln(x.describe()); */
 }
 unittest{
-  int a = 5, d = 2;
+  int a = 5, d = 3;
   auto cp = new CoverPoint!(d,q{
       bins [2] a = {2,3};
       })();
@@ -1066,13 +1092,34 @@ unittest{
   auto x = new Cross!(cp,cp2)();
   /* writeln(cp.describe()); */
   /* writeln(cp2.describe()); */
-  cp.sample();
-  cp2.sample();
   x.sample();
-  writeln(x.len,x._hits.length);
-  foreach(i, elem; x._hits){
-    foreach(j,elem2; elem){
-      writeln(i,j,elem2);
-    }
-  }
+  auto tmp = x.get_cross_inst_hits();
+  assert(tmp[1][1] && !tmp[0][0] && !tmp[0][1] && !tmp[1][0]);
+
+  a = 4;
+  x.sample();
+  tmp = x.get_cross_inst_hits();
+  assert(tmp[1][0] && !tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
+
+  d = 2;
+  x.sample();
+  tmp = x.get_cross_inst_hits();
+  assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
+  // sampling works
+}
+
+unittest{
+  int a = 1, b = 2;
+  auto x = new CoverPoint!(a,q{
+      bins x1 = {1,2,3};
+      bins x2 = {1};
+      })();
+
+  writeln(x.describe());
+  auto xb = new Cross!(x,b)();
+  xb.sample();
+  // bug in default bin generation 
+
+  /* writeln(xb._hits.length); */
+  /* assert(); */
 }
