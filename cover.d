@@ -273,7 +273,7 @@ struct parser (T){
         srcTag = parseLiteral();
         string min;
         if(BINS[srcTag .. srcCursor] == "$"){
-          min = T.max.stringof;
+          min = T .max.stringof;
         }
         else{
           min = BINS[srcTag .. srcCursor];
@@ -629,7 +629,7 @@ string crossSampleHelper(int n){
   return s;
 }
 
-string arrayInitialising(int n) (string name){
+string arrayInitialising(string name, int n){
   import std.conv;
   string s,tmp = name;
   s ~= name ~ ".length = bincnts[0];\n";
@@ -646,7 +646,7 @@ string arrayInitialising(int n) (string name){
   return s;
 }
 
-string sampleCoverpoints(int n) (){
+string sampleCoverpoints(int n){
   import std.conv;
   string s;
   for(int i = 0; i < n; i++){
@@ -655,7 +655,7 @@ string sampleCoverpoints(int n) (){
   return s;
 }
 
-class Cross ( N... ): coverInterface{
+class CrossClass ( N... ): coverInterface{
   enum size_t len = N.length;
   ulong [] bincnts;
   mixin(makeArray(len, "uint", "_hits"));
@@ -664,22 +664,23 @@ class Cross ( N... ): coverInterface{
   this (){
     import std.traits: isIntegral;
     foreach (i , elem; N){
-      static if (is (typeof(elem): coverInterface)){
-        coverPoints ~= elem;
+      static if (!(isIntegral!(typeof(elem)))){
+	elem.Initialize();
+        coverPoints ~= elem.innerClass;
         bincnts ~= elem.getBins().length;
       }
       else {
-        auto tmp = new CoverPoint!(elem)();
+        auto tmp = new CoverPointClass!(elem)();
         coverPoints ~= tmp;
         bincnts ~= tmp.getBins().length;
       }
     }
-    mixin(arrayInitialising!(len)("_hits"));
-    mixin(arrayInitialising!(len)("_inst_hits"));
+    mixin(arrayInitialising("_hits", len));
+    mixin(arrayInitialising("_inst_hits", len));
   }
   override void sample(){
-    mixin(arrayInitialising!(len)("_inst_hits"));
-    mixin(sampleCoverpoints!(len)());
+    mixin(arrayInitialising("_inst_hits", len));
+    mixin(sampleCoverpoints(len));
     mixin(crossSampleHelper(N.length));
   }
   override double get_coverage(){
@@ -715,15 +716,56 @@ interface coverInterface {
   //double inst_query();
 }
 
-class CoverPoint(alias t, string BINS="") : coverInterface{
+struct CoverPoint (alias t, string BINS=""){
+  coverInterface innerClass;
+  void Initialize (){
+    if (innerClass is null)
+      innerClass = new CoverPointClass!(t, BINS)();
+  }
+  
+  auto getBins() {
+    Initialize();
+    return (cast(CoverPointClass!(t, BINS))(innerClass)).getBins();
+  }
+  
+  string describe(){
+    Initialize();
+    return (cast(CoverPointClass!(t, BINS))(innerClass)).describe();
+  }
+  void sample(){
+    Initialize();
+    innerClass.sample();
+  }
+  double get_coverage(){
+    Initialize();
+    return innerClass.get_coverage();
+  }
+  double get_inst_coverage(){
+    Initialize();
+    return innerClass.get_inst_coverage();
+  }
+  void start(){
+    Initialize();
+    innerClass.start();
+  }
+  void stop(){
+    Initialize();
+    innerClass.stop();
+  }
+  bool [] get_inst_hits(){
+    Initialize();
+    return innerClass.get_inst_hits();
+  }
+}
+class CoverPointClass(alias t, string BINS="") : coverInterface{
   import std.traits: isIntegral;
-  //import esdl.data.bvec: isBitVector;
+  // import esdl.data.bvec: isBitVector;
   alias T = typeof(t);
 
-  static assert(isIntegral!T || isBitVector!T || is(T: bool),
-      "Only integral, bitvec, or bool values can be covered."
-      ~ " Unable to cover a value of type: " ~ T.stringof);
-  T* _point; // = &t;
+  // static assert(isIntegral!T || isBitVector!T || is(T: bool),
+  //     "Only integral, bitvec, or bool values can be covered."
+  //     ~ " Unable to cover a value of type: " ~ T.stringof);
+  // T* _point; // = &t;
   //char[] outBuffer;
   string outBuffer;
   bool [] _inst_hits;
@@ -750,52 +792,42 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
   Bin!(T)[] _sbins;
   Bin!(T)[] _dbins;	     // We keep a count of how many times a bin is hit
   int _pos;	     // position of t the covergoup; -1 otherwise
-  void _initPoint(G)(G g) {
-    auto _outer = g.outer;
-    assert (_outer !is null);
-    static if (__traits(hasMember, g, t.stringof)) {
-      _point = &(__traits(getMember, g, t.stringof));
-      assert(_point !is null);
-    }
-    else static if (__traits(hasMember, g.outer, t.stringof)) {
-      _point = &(__traits(getMember, _outer, t.stringof));
-      assert(_point !is null);
-    }
-    else {
-      _point = &(t);
-      assert(_point !is null);
-    }
-    static if (isIntegral!T) {
-      _bins.length = 64;
-    }
-    else static if (is(T == bool)) {
-      _bins.length = 2;
-    }
-    else {
-      static if (T.SIZE > 6) {
-        _bins.length = 64;
-      }
-      else {
-        _bins.length = T.max - T.min;
-      }
-    }
-  }
+  // void _initPoint(G)(G g) {
+  //   auto _outer = g.outer;
+  //   assert (_outer !is null);
+  //   static if (__traits(hasMember, g, t.stringof)) {
+  //     _point = &(__traits(getMember, g, t.stringof));
+  //     assert(_point !is null);
+  //   }
+  //   else static if (__traits(hasMember, g.outer, t.stringof)) {
+  //     _point = &(__traits(getMember, _outer, t.stringof));
+  //     assert(_point !is null);
+  //   }
+  //   else {
+  //     _point = &(t);
+  //     assert(_point !is null);
+  //   }
+  //   static if (isIntegral!T) {
+  //     _bins.length = 64;
+  //   }
+  //   else static if (is(T == bool)) {
+  //     _bins.length = 2;
+  //   }
+  //   else {
+  //     static if (T.SIZE > 6) {
+  //       _bins.length = 64;
+  //     }
+  //     else {
+  //       _bins.length = T.max - T.min;
+  //     }
+  //   }
+  // }
 
-  void _initPos(int pos) {
-    _pos = pos;
-  }
 
   auto getBins() {
     return _bins;
   }
-  void print(){
-    import std.stdio;
-    /*
-       foreach(elem; outBuffer){
-       write(elem);
-       }*/
-    write(outBuffer);
-  }
+  
   import std.stdio;
 
   import std.conv;
@@ -900,146 +932,146 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
   bool _isInitialized;		// true if the CoverGroup has been initialized
   }*/
 
-private void initialize(G, int I=0)(G g) if (is(G: CoverGroup)) {
-  static if (I == 0) {
-    if (g._isInitialized) return;
-    else g._isInitialized = true;
-  }
-  static if (I >= G.tupleof.length) {
-    return;
-  }
-  else {
-    alias E = typeof(g.tupleof[I]);
-    static if (is (E: CoverPoint!(t, S), alias t, string S)) {
-      g.tupleof[I]._initPoint(g);
-      int index = findElementIndex!(t.stringof, G);
-      g.tupleof[I]._initPos(index);
-    }
-    initialize!(G, I+1)(g);
-  }
-}
+// private void initialize(G, int I=0)(G g) if (is(G: CoverGroup)) {
+//   static if (I == 0) {
+//     if (g._isInitialized) return;
+//     else g._isInitialized = true;
+//   }
+//   static if (I >= G.tupleof.length) {
+//     return;
+//   }
+//   else {
+//     alias E = typeof(g.tupleof[I]);
+//     static if (is (E: CoverPointClass!(t, S), alias t, string S)) {
+//       g.tupleof[I]._initPoint(g);
+//       int index = findElementIndex!(t.stringof, G);
+//       g.tupleof[I]._initPos(index);
+//     }
+//     initialize!(G, I+1)(g);
+//   }
+// }
 
-private void samplePoints(int I, int N, G)(G g) if (is(G: CoverGroup)) {
-  static if (I >= G.tupleof.length) {
-    return;
-  }
-  else {
-    alias E = typeof(g.tupleof[I]);
-    static if (is (E: CoverPoint!(t, S), alias t, string S)) {
-      g.tupleof[I].sample(N);
-    }
-    samplePoints!(I+1, N)(g);
-  }
-}
+// private void samplePoints(int I, int N, G)(G g) if (is(G: CoverGroup)) {
+//   static if (I >= G.tupleof.length) {
+//     return;
+//   }
+//   else {
+//     alias E = typeof(g.tupleof[I]);
+//     static if (is (E: CoverPointClass!(t, S), alias t, string S)) {
+//       g.tupleof[I].sample(N);
+//     }
+//     samplePoints!(I+1, N)(g);
+//   }
+// }
 
 
-public void sample(G, V...)(G g, V v) if (is(G: CoverGroup)) {
-  // navigate through the class elements of G to know the CoverPoint
-  // instantiations as well as any Integral/BitVector instances
-  sampleArgs!(0)(g, v);
-  initialize(g);
-  // Now look for all the coverpoints
-  samplePoints!(0, V.length)(g);
-}
+// public void sample(G, V...)(G g, V v) if (is(G: CoverGroup)) {
+//   // navigate through the class elements of G to know the CoverPointClass
+//   // instantiations as well as any Integral/BitVector instances
+//   sampleArgs!(0)(g, v);
+//   initialize(g);
+//   // Now look for all the coverpoints
+//   samplePoints!(0, V.length)(g);
+// }
 
-private void sampleArgs(int I, G, V...)(G g, V v) {
-  import std.traits: isAssignable;
-  static if (V.length == 0) {
-    return;
-  }
-  else {
-    alias VAL_TUPLE = getIntElements!G;
-    alias N = VAL_TUPLE[I];
-    static assert (isAssignable!(typeof(G.tupleof[N]), V[0]),
-        "Method sample called with argument of type " ~
-        V[0].stringof ~ " at position " ~ I.stringof ~
-        " is not assignable to type " ~
-        typeof(G.tupleof[N]).stringof);
-    static if (I == 0) {
-      static assert (VAL_TUPLE.length >= V.length,
-          "Method sample called with " ~ V.length.stringof ~
-          " arguments, while it can take only " ~
-          VAL_TUPLE.length.stringof ~
-          " arguments for covergroup of type: " ~ G.stringof);
-    }
-    g.tupleof[N] = v[0];
-    sampleArgs!(I+1)(g, v[1..$]);
-  }
-}
+// private void sampleArgs(int I, G, V...)(G g, V v) {
+//   import std.traits: isAssignable;
+//   static if (V.length == 0) {
+//     return;
+//   }
+//   else {
+//     alias VAL_TUPLE = getIntElements!G;
+//     alias N = VAL_TUPLE[I];
+//     static assert (isAssignable!(typeof(G.tupleof[N]), V[0]),
+//         "Method sample called with argument of type " ~
+//         V[0].stringof ~ " at position " ~ I.stringof ~
+//         " is not assignable to type " ~
+//         typeof(G.tupleof[N]).stringof);
+//     static if (I == 0) {
+//       static assert (VAL_TUPLE.length >= V.length,
+//           "Method sample called with " ~ V.length.stringof ~
+//           " arguments, while it can take only " ~
+//           VAL_TUPLE.length.stringof ~
+//           " arguments for covergroup of type: " ~ G.stringof);
+//     }
+//     g.tupleof[N] = v[0];
+//     sampleArgs!(I+1)(g, v[1..$]);
+//   }
+// }
 
-// return a tuple of integral elements
-private template getIntElements(G, int N=0, I...) {
-  import std.traits: isIntegral;
-  import esdl.data.bvec: isBitVector;
-  static if (N == G.tupleof.length) {
-    enum getIntElements = I;
-  }
-  else {
-    alias T = typeof(G.tupleof[N]);
-    static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-      enum getIntElements = getIntElements!(G, N+1, I, N);
-    }
-    else {
-      enum getIntElements = getIntElements!(G, N+1, I);
-    }
-  }
-}
+// // return a tuple of integral elements
+// private template getIntElements(G, int N=0, I...) {
+//   import std.traits: isIntegral;
+//   import esdl.data.bvec: isBitVector;
+//   static if (N == G.tupleof.length) {
+//     enum getIntElements = I;
+//   }
+//   else {
+//     alias T = typeof(G.tupleof[N]);
+//     static if (isBitVector!T || isIntegral!T || is(T == bool)) {
+//       enum getIntElements = getIntElements!(G, N+1, I, N);
+//     }
+//     else {
+//       enum getIntElements = getIntElements!(G, N+1, I);
+//     }
+//   }
+// }
 
-private template findElementIndex(string E, G, int I=0, int N=0) {
-  import std.traits: isIntegral;
-  import esdl.data.bvec: isBitVector;
-  static if(I >= G.tupleof.length) {
-    enum findElementIndex = -1;
-  } else {
-    alias T = typeof(G.tupleof[I]);
-    static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-      static if (E == G.tupleof[I].stringof) {
-        enum findElementIndex = N;
-      }
-      else {
-        enum findElementIndex =  findElementIndex!(E, G, I+1, N+1);
-      }
-    }
-    else {
-      enum findElementIndex = findElementIndex!(E, G, I+1, N);
-    }
-  }
-}
+// private template findElementIndex(string E, G, int I=0, int N=0) {
+//   import std.traits: isIntegral;
+//   import esdl.data.bvec: isBitVector;
+//   static if(I >= G.tupleof.length) {
+//     enum findElementIndex = -1;
+//   } else {
+//     alias T = typeof(G.tupleof[I]);
+//     static if (isBitVector!T || isIntegral!T || is(T == bool)) {
+//       static if (E == G.tupleof[I].stringof) {
+//         enum findElementIndex = N;
+//       }
+//       else {
+//         enum findElementIndex =  findElementIndex!(E, G, I+1, N+1);
+//       }
+//     }
+//     else {
+//       enum findElementIndex = findElementIndex!(E, G, I+1, N);
+//     }
+//   }
+// }
 
-private template nthIntElement(alias g, int N, int I=0) {
-  import std.traits: isIntegral;
-  import esdl.data.bvec: isBitVector;
-  static assert(I < g.tupleof.length);
-  alias T = typeof(g.tupleof[I]);
-  static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-    static if (N == 0) {
-      enum nthIntElement = g.tupleof[I];
-    }
-    else {
-      enum nthIntElement = nthIntElement!(g, N-1, I+1);
-    }
-  }
-  else {
-    enum nthIntElement = nthIntElement!(g, N, I+1);
-  }
-}
+// private template nthIntElement(alias g, int N, int I=0) {
+//   import std.traits: isIntegral;
+//   import esdl.data.bvec: isBitVector;
+//   static assert(I < g.tupleof.length);
+//   alias T = typeof(g.tupleof[I]);
+//   static if (isBitVector!T || isIntegral!T || is(T == bool)) {
+//     static if (N == 0) {
+//       enum nthIntElement = g.tupleof[I];
+//     }
+//     else {
+//       enum nthIntElement = nthIntElement!(g, N-1, I+1);
+//     }
+//   }
+//   else {
+//     enum nthIntElement = nthIntElement!(g, N, I+1);
+//   }
+// }
 
-private template countIntElements(G, int COUNT=0, int I=0) {
-  import std.traits: isIntegral;
-  import esdl.data.bvec: isBitVector;
-  static if (I != G.tupleof.length) {
-    alias T = typeof(G.tupleof[I]);
-    static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-      enum countIntElements = countIntElements!(G, COUNT+1, I+1);
-    }
-    else {
-      enum countIntElements = countIntElements!(G, COUNT, I+1);
-    }
-  }
-  else {
-    enum countIntElements = COUNT;
-  }
-}
+// private template countIntElements(G, int COUNT=0, int I=0) {
+//   import std.traits: isIntegral;
+//   import esdl.data.bvec: isBitVector;
+//   static if (I != G.tupleof.length) {
+//     alias T = typeof(G.tupleof[I]);
+//     static if (isBitVector!T || isIntegral!T || is(T == bool)) {
+//       enum countIntElements = countIntElements!(G, COUNT+1, I+1);
+//     }
+//     else {
+//       enum countIntElements = countIntElements!(G, COUNT, I+1);
+//     }
+//   }
+//   else {
+//     enum countIntElements = COUNT;
+//   }
+// }
 void main (){
   /* int [] tmp; */
   /* tmp ~= 1;tmp ~= 5; */
@@ -1048,19 +1080,19 @@ void main (){
 }
 unittest {
   int p;
-  auto x = new CoverPoint!(p, q{
+  auto x = CoverPoint!(p, q{
       bins a = {     1 , 2 }  ;
 
       })();
   import std.stdio;
-  /* writeln(x.describe()); */
+  writeln(x.describe()); 
   //x.print();
   //import std.stdio;
   //writeln(x.describe());
 }
 unittest {
   int p;
-  auto x = new CoverPoint!(p, q{
+  auto x = new CoverPointClass!(p, q{
       bins a = { [0:63],65 };
       bins [] b = { [127:130],[137:147],200,[100:108] }; // note overlapping values
       bins [3]c = { 200,201,202,204 };
@@ -1075,21 +1107,70 @@ unittest {
 }
 unittest {
   int p;
-  auto x = new CoverPoint!(p, q{
+  auto x = CoverPoint!(p, q{
+      bins a = { [0:63],65 };
+      bins [] b = { [127:130],[137:147],200,[100:108] }; // note overlapping values
+      bins [3]c = { 200,201,202,204 };
+      bins d = { [1000:$] };
+      bins e = { 125 };
+      //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
+      })();
+  import std.stdio;
+  writeln(x.describe()); 
+  //import std.stdio;
+  //writeln(x.describe());
+}
+unittest {
+  int p;
+  auto x = new CoverPointClass!(p, q{
       bins [32] a = {[-2147483647:2147483647]};
       })();
   import std.stdio;
   /* writeln(x.describe()); */
 }
+unittest {
+  int p;
+  auto x = CoverPoint!(p, q{
+      bins [32] a = {[-2147483647:2147483647]};
+      })();
+  import std.stdio;
+  writeln(x.describe());
+}
+// unittest{
+//   int a = 5, d = 3;
+//   auto cp = new CoverPointClass!(d,q{
+//       bins [2] a = {2,3};
+//       })();
+//   auto cp2 = new CoverPointClass!(a,q{
+//     bins [] cp2 = {4,5};
+//   })();
+//   auto x = new CrossClass!(cp,cp2)();
+//   /* writeln(cp.describe()); */
+//   /* writeln(cp2.describe()); */
+//   x.sample();
+//   auto tmp = x.get_cross_inst_hits();
+//   assert(tmp[1][1] && !tmp[0][0] && !tmp[0][1] && !tmp[1][0]);
+
+//   a = 4;
+//   x.sample();
+//   tmp = x.get_cross_inst_hits();
+//   assert(tmp[1][0] && !tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
+
+//   d = 2;
+//   x.sample();
+//   tmp = x.get_cross_inst_hits();
+//   assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
+//   // sampling works
+// }
 unittest{
   int a = 5, d = 3;
-  auto cp = new CoverPoint!(d,q{
+  auto cp = CoverPoint!(d,q{
       bins [2] a = {2,3};
       })();
-  auto cp2 = new CoverPoint!(a,q{
+  auto cp2 = CoverPoint!(a,q{
     bins [] cp2 = {4,5};
   })();
-  auto x = new Cross!(cp,cp2)();
+  auto x = new CrossClass!(cp,cp2)();
   /* writeln(cp.describe()); */
   /* writeln(cp2.describe()); */
   x.sample();
@@ -1108,18 +1189,25 @@ unittest{
   // sampling works
 }
 
-unittest{
-  int a = 1, b = 2;
-  auto x = new CoverPoint!(a,q{
-      bins x1 = {1,2,3};
-      bins x2 = {1};
-      })();
+// unittest{
+//   int a = 1, b = 2;
+//   auto x = new CoverPointClass!(a,q{
+//       bins x1 = {1,2,3};
+//       bins x2 = {1};
+//       })();
 
-  writeln(x.describe());
-  auto xb = new Cross!(x,b)();
-  xb.sample();
-  // bug in default bin generation 
+//   writeln(x.describe());
+//   auto xb = new CrossClass!(x,b)();
+//   // xb.sample();
+//   // bug in default bin generation 
 
-  /* writeln(xb._hits.length); */
-  /* assert(); */
+//   /* writeln(xb._hits.length); */
+//   /* assert(); */
+// }
+unittest {
+  int a;
+  auto x = CoverPoint!(a, q{
+      bins a = {     1 , 2 }  ;
+
+    })();
 }
