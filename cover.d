@@ -16,7 +16,7 @@ static string doParse(T)(string Bins){
   return Parser.parse();
 }
 
-enum Type: bool {SINGLE, MULTIPLE};
+/* enum Type: bool {SINGLE, MULTIPLE}; */
 
 struct parser (T){
   import std.conv;
@@ -595,6 +595,21 @@ struct Bin(T)
   }
 };
 
+// interface:  
+
+interface coverInterface {
+  void sample ();
+  double get_coverage();
+  double get_inst_coverage();
+  void start();
+  void stop();
+  bool [] get_inst_hits();
+  //double query();
+  //double inst_query();
+}
+
+// cross stuff: 
+
 string makeArray(size_t len, string type,string name){
   string s = type ~ " ";
   for(int i = 0; i < len; i++){
@@ -655,6 +670,38 @@ string sampleCoverpoints(int n){
   return s;
 }
 
+struct Cross ( N... ){
+  coverInterface innerClass;
+  void Initialize(){
+    if(innerClass is null)
+      innerClass = new CrossClass!( N )();
+  }
+  void sample(){
+    Initialize();
+    innerClass.sample();
+  }
+  double get_coverage(){
+    Initialize();
+    return innerClass.get_coverage();
+  }
+  double get_inst_coverage(){
+    Initialize();
+    return innerClass.get_inst_coverage();
+  }
+  void start(){
+    Initialize();
+    innerClass.start();
+  }
+  void stop(){
+    Initialize();
+    innerClass.stop();
+  }
+  auto get_cross_inst_hits(){
+    Initialize();
+    return (cast(CrossClass!(N))(innerClass)).get_cross_inst_hits();
+  }
+}
+
 class CrossClass ( N... ): coverInterface{
   enum size_t len = N.length;
   ulong [] bincnts;
@@ -665,7 +712,7 @@ class CrossClass ( N... ): coverInterface{
     import std.traits: isIntegral;
     foreach (i , elem; N){
       static if (!(isIntegral!(typeof(elem)))){
-	elem.Initialize();
+        elem.Initialize();
         coverPoints ~= elem.innerClass;
         bincnts ~= elem.getBins().length;
       }
@@ -705,16 +752,6 @@ class CrossClass ( N... ): coverInterface{
   }
 }
 
-interface coverInterface {
-  void sample ();
-  double get_coverage();
-  double get_inst_coverage();
-  void start();
-  void stop();
-  bool [] get_inst_hits();
-  //double query();
-  //double inst_query();
-}
 
 struct CoverPoint (alias t, string BINS=""){
   coverInterface innerClass;
@@ -873,7 +910,7 @@ class CoverPointClass(alias t, string BINS="") : coverInterface{
           binleft = Binsize;
         }
         /* if(Binsize != 1){ */
-        size_t rangeCount = ranges[i]._max - ranges[i]._min + 1;
+        size_t rangeCount = size_t(ranges[i]._max) - size_t(ranges[i]._min) + 1;
         if(rangeCount > binleft){
           //makeBins ~= 
           _bins[$ - (arrSize - binNum)].addRange((ranges[i]._min), (ranges[i]._min + binleft - 1));
@@ -1073,10 +1110,6 @@ class CoverPointClass(alias t, string BINS="") : coverInterface{
 //   }
 // }
 void main (){
-  /* int [] tmp; */
-  /* tmp ~= 1;tmp ~= 5; */
-  /* writeln(arrayInitialising(2,"hello", tmp)); */
-  /* writeln(arrayInitialising!(4)("_hits")); */
 }
 unittest {
   int p;
@@ -1123,10 +1156,10 @@ unittest {
 unittest {
   int p;
   auto x = new CoverPointClass!(p, q{
-      bins [32] a = {[-2147483647:2147483647]};
+      bins [32] a = {[-2147483648:2147483647]};
       })();
   import std.stdio;
-  /* writeln(x.describe()); */
+  writeln(x.describe());
 }
 unittest {
   int p;
@@ -1136,32 +1169,32 @@ unittest {
   import std.stdio;
   writeln(x.describe());
 }
-// unittest{
-//   int a = 5, d = 3;
-//   auto cp = new CoverPointClass!(d,q{
-//       bins [2] a = {2,3};
-//       })();
-//   auto cp2 = new CoverPointClass!(a,q{
-//     bins [] cp2 = {4,5};
-//   })();
-//   auto x = new CrossClass!(cp,cp2)();
-//   /* writeln(cp.describe()); */
-//   /* writeln(cp2.describe()); */
-//   x.sample();
-//   auto tmp = x.get_cross_inst_hits();
-//   assert(tmp[1][1] && !tmp[0][0] && !tmp[0][1] && !tmp[1][0]);
+unittest{
+  int a = 5, d = 3;
+  auto cp = CoverPoint!(d,q{
+      bins [2] a = {2,3};
+      })();
+  auto cp2 = CoverPoint!(a,q{
+    bins [] cp2 = {4,5};
+  })();
+  auto x = Cross!(cp,cp2)();
+  /* writeln(cp.describe()); */
+  /* writeln(cp2.describe()); */
+  x.sample();
+  auto tmp = x.get_cross_inst_hits();
+  assert(tmp[1][1] && !tmp[0][0] && !tmp[0][1] && !tmp[1][0]);
 
-//   a = 4;
-//   x.sample();
-//   tmp = x.get_cross_inst_hits();
-//   assert(tmp[1][0] && !tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
+  a = 4;
+  x.sample();
+  tmp = x.get_cross_inst_hits();
+  assert(tmp[1][0] && !tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
 
-//   d = 2;
-//   x.sample();
-//   tmp = x.get_cross_inst_hits();
-//   assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
-//   // sampling works
-// }
+  d = 2;
+  x.sample();
+  tmp = x.get_cross_inst_hits();
+  assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
+  // sampling works
+}
 unittest{
   int a = 5, d = 3;
   auto cp = CoverPoint!(d,q{
@@ -1189,21 +1222,17 @@ unittest{
   // sampling works
 }
 
-// unittest{
-//   int a = 1, b = 2;
-//   auto x = new CoverPointClass!(a,q{
-//       bins x1 = {1,2,3};
-//       bins x2 = {1};
-//       })();
-
-//   writeln(x.describe());
-//   auto xb = new CrossClass!(x,b)();
-//   // xb.sample();
-//   // bug in default bin generation 
-
-//   /* writeln(xb._hits.length); */
-//   /* assert(); */
-// }
+unittest{
+  int a = 1, b = 2;
+  auto x = CoverPoint!(a,q{
+      bins x1 = {1,2,3};
+      bins x2 = {1};
+      })();
+  auto xb = Cross!(x,b)();
+  xb.sample();
+  // bug in default bin generation 
+  /* assert(); */
+}
 unittest {
   int a;
   auto x = CoverPoint!(a, q{
