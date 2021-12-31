@@ -325,7 +325,7 @@ struct parser (T){
         srcTag = parseLiteral();
         string min;
         if(BINS[srcTag .. srcCursor] == "$"){
-          min = T .max.stringof;
+          min = T.max.stringof;
         }
         else{
           min = BINS[srcTag .. srcCursor];
@@ -720,15 +720,12 @@ string sampleCoverpoints(int n){
   import std.conv;
   string s;
   for(int i = 0; i < n; i++){
-    s ~= "if (isIntegral!(N[" ~ i.to!string() ~ "]))";
+    s ~= "if (isIntegral!(typeof(N[" ~ i.to!string() ~ "])))";
     s ~= "coverPoints[" ~ i.to!string() ~ "].sample();\n";
   }
   return s;
 }
 
-auto Cross (N...)(ref N args){
-  return new CrossClass!N(args);
-}
 
 // struct Cross ( N... ){
 //   coverInterface innerClass;
@@ -769,22 +766,22 @@ auto Cross (N...)(ref N args){
 //   }
 // }
 
-class CrossClass ( N... ): coverInterface{
+class Cross ( N... ): coverInterface{
   import std.traits: isIntegral;
   enum size_t len = N.length;
   ulong [] bincnts;
   mixin(makeArray(len, "uint", "_hits"));
   mixin(makeArray(len, "bool", "_inst_hits"));
   coverInterface [] coverPoints;
-  this (ref N args){
-    foreach (i , ref elem; args){
+  this (){
+    foreach (i , ref elem; N){
       static if (!(isIntegral!(typeof(elem)))){
         // elem.Initialize();
         coverPoints ~= elem;
         bincnts ~= elem.getBins().length;
       }
       else {
-        auto tmp = CoverPoint(elem);
+        auto tmp = new CoverPoint!(elem)();
         coverPoints ~= tmp;
         bincnts ~= tmp.getBins().length;
       }
@@ -822,9 +819,6 @@ class CrossClass ( N... ): coverInterface{
   }
 }
 
-auto CoverPoint(string BINS="", T)(ref T t){
-  return new CoverPointClass!(BINS, T)(t);
-}
 
 // struct CoverPoint (string BINS="", T){
 //   coverInterface innerClass;
@@ -862,23 +856,22 @@ auto CoverPoint(string BINS="", T)(ref T t){
 //     return false;
 //   }
 // }
-class CoverPointClass(string BINS="", T) : coverInterface{
+class CoverPoint(alias t, string BINS="") : coverInterface{
   import std.traits: isIntegral;
   // import esdl.data.bvec: isBitVector;
-  T* var;
   // static assert(isIntegral!T || isBitVector!T || is(T: bool),
   //     "Only integral, bitvec, or bool values can be covered."
   //     ~ " Unable to cover a value of type: " ~ T.stringof);
   // T* _point; // = &t;
-  //char[] outBuffer;
+  //char[] outBuffer;nnnnn
+  alias T = typeof(t);
   string outBuffer;
   bool [] _inst_hits;
   size_t _num_hits;
   size_t _num_inst_hits;
-  this (ref T t){
+  this (){
 
     import std.stdio;
-    var = &t;
     static if (BINS != ""){
       mixin(doParse!T(BINS));
     }
@@ -1011,7 +1004,7 @@ class CoverPointClass(string BINS="", T) : coverInterface{
   override void sample(){
     foreach(i,bin;_bins){
       _inst_hits[i] = false;
-      if(bin.checkHit(*(var))){
+      if(bin.checkHit(t)){
 	if (bin._hits == 0){
 	  _num_hits ++;
 	}
@@ -1189,10 +1182,10 @@ void main (){
 }
 unittest {
   int p;
-  auto x = CoverPoint!(q{
+  auto x = new CoverPoint!(p, q{
       bins a = {     1 , 2 }  ;
 
-    })(p);
+    })();
   import std.stdio;
   writeln(x.describe()); 
   //x.print();
@@ -1216,14 +1209,14 @@ unittest {
 // }
 unittest {
   int p;
-  auto x = CoverPoint!(q{
+  auto x = new CoverPoint!(p, q{
       bins a = { [0:63],65 };
       bins [] b = { [127:130],[137:147],200,[100:108] }; // note overlapping values
       bins [3]c = { 200,201,202,204 };
       bins d = { [1000:$] };
       bins e = { 125 };
       //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
-    })(p);
+    })();
   import std.stdio;
   writeln(x.describe()); 
   //import std.stdio;
@@ -1239,21 +1232,21 @@ unittest {
 // }
 unittest {
   int p;
-  auto x = CoverPoint!(q{
+  auto x = new CoverPoint!(p, q{
       bins [32] a = {[-2147483647:2147483647]};
-    })(p);
+    })();
   import std.stdio;
   writeln(x.describe());
 }
 unittest{
   int a = 5, d = 3;
-  auto cp = CoverPoint!(q{
+  auto cp = new CoverPoint!(d, q{
       bins [2] a = {2,3};
-    })(d);
-  auto cp2 = CoverPoint!(q{
+    })();
+  auto cp2 = new CoverPoint!(a, q{
       bins [] cp2 = {4,5};
-    })(a);
-  auto x = Cross(cp, cp2);
+    })();
+  auto x = new Cross!(cp, cp2)();
   /* writeln(cp.describe()); */
   /* writeln(cp2.describe()); */
   cp.sample();
@@ -1312,13 +1305,13 @@ unittest{
 
 unittest{
   int a = 1, b = 2;
-  auto x = CoverPoint!(q{
+  auto x = new CoverPoint!(a, q{
       bins x1 = {1,2,3};
       bins x2 = {1};
-    })(a);
+    })();
 
   
-  auto xb = Cross(x,b);
+  auto xb = new Cross!(x,b)();
   x.sample();
   xb.sample();
   // bug in default bin generation 
@@ -1326,8 +1319,8 @@ unittest{
 }
 unittest {
   int a;
-  auto x = CoverPoint!(q{
+  auto x = new CoverPoint!(a, q{
       bins a = {     1 , 2 }  ;
 
-    })(a);
+    })();
 }
