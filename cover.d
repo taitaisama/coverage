@@ -17,10 +17,11 @@ static string doParse(T)(string Bins){
 }
 
 /* enum Type: bool {SINGLE, MULTIPLE}; */
-class CoverGroup {
+interface CoverGroup {
   
 }
-void sample (CoverGroup grp){
+void sample (T)(T grp) if (is(T: CoverGroup)){
+  
   import std.typecons: Tuple;
   auto tup = grp.tupleof;
   foreach (ref elem; tup){
@@ -34,7 +35,7 @@ void sample (CoverGroup grp){
     }
   }
 }
-double get_coverage(CoverGroup grp){
+double get_coverage (T)(T grp) if (is(T: CoverGroup)){
   import std.typecons: Tuple;
   auto tup = grp.tupleof;
   double total = 0;
@@ -43,9 +44,11 @@ double get_coverage(CoverGroup grp){
     total += elem.get_coverage()*elem.get_weight();
     weightSum += elem.get_weight();
   }
+  writeln(total, " ", weightSum);
   return total/weightSum;
+  
 }
-double get_inst_coverage(CoverGroup grp){
+double get_inst_coverage (T)(T grp) if (is(T: CoverGroup)){
   import std.typecons: Tuple;
   auto tup = grp.tupleof;
   double total = 0;
@@ -56,14 +59,14 @@ double get_inst_coverage(CoverGroup grp){
   }
   return total/weightSum;
 }
-void start (CoverGroup grp){
+void start (T)(T grp) if (is(T: CoverGroup)){
   import std.typecons: Tuple;
   auto tup = grp.tupleof;
   foreach (ref elem; tup){
     elem.start();
   }
 }
-void stop (CoverGroup grp){
+void stop (T)(T grp) if (is(T: CoverGroup)){
   import std.typecons: Tuple;
   auto tup = grp.tupleof;
   foreach (ref elem; tup){
@@ -658,7 +661,7 @@ interface coverInterface {
   void stop();
   bool [] get_inst_hits();
   size_t get_weight();
-  
+  bool isCross();
   //double query();
   //double inst_query();
 }
@@ -816,6 +819,9 @@ class Cross ( N... ): coverInterface{
   }
   override size_t get_weight(){
     return 1;
+  }
+  override bool isCross(){
+    return true;
   }
 }
 
@@ -1002,6 +1008,7 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
     return s;
   }
   override void sample(){
+    // writeln("sampleCalled");
     foreach(i,bin;_bins){
       _inst_hits[i] = false;
       if(bin.checkHit(t)){
@@ -1031,6 +1038,9 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
   }
   override size_t get_weight(){
     return 1;
+  }
+  override bool isCross(){
+    return false;
   }
 }
 
