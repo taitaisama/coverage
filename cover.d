@@ -451,13 +451,23 @@ struct parser (T){
     else if(bintype == BinType.DYNAMIC) {
       parseSpace();
       auto srcTag = parseName();
-      fill(type ~ "_dbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+      if (type == "_ig"){
+	fill(type ~ "_bins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");	
+      }
+      else {
+	fill(type ~ "_dbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+      }
       parseSpace();
       parseEqual();
       parseSpace();
       parseCurlyOpen();
       parseSpace();
-      parseBin(type ~ "_dbins");
+      if (type == "_ig"){
+	parseBin(type ~ "_bins");
+      }
+      else {
+	parseBin(type ~ "_dbins");
+      }
     }
     else {
       auto srcTag = parseLiteral();
@@ -469,20 +479,29 @@ struct parser (T){
       ++srcCursor;
       parseSpace();
       srcTag = parseName();
-      fill(type ~ "_sbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
-      fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
+      if (type == "_ig"){ //no need for arrays in ignore bins
+	fill(type ~ "_bins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+	// fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
+      }
+      else {
+	fill(type ~ "_sbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+	fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
+      }
       parseSpace();
       parseEqual();
       parseSpace();
       parseCurlyOpen();
       parseSpace();
-      parseBin(type ~ "_sbins");
+      if (type == "_ig"){
+	parseBin(type ~ "_bins");
+      }
+      else {
+	parseBin(type ~ "_sbins");
+      }
     }
     ++srcCursor;
     parseSpace();
     if(BINS[srcCursor] != ';'){
-      import std.stdio;
-      writeln("hello");
       assert(false, "';' expected, not found at line " ~ srcLine.to!string);
     }
     ++srcCursor;
@@ -625,7 +644,7 @@ struct Bin(T)
     return _ranges.length;
   }
   
-  void negateBins(){
+  void negateBin(){
     // if (isEmpty()){
     //   T[2] temp = [T.min, T.max];
     //   this ~= temp;
@@ -1125,6 +1144,7 @@ class Cross ( N... ): coverInterface{
 //     return false;
 //   }
 // }
+
 class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   import std.traits: isIntegral;
   // import esdl.data.bvec: isBitVector;
@@ -1151,11 +1171,12 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
     // writeln(doParse!T(BINS));
 
     procDyanamicBins(_bins,_dbins);
-    procDyanamicBins(_ig_bins,_ig_dbins);
+    // procDyanamicBins(_ig_bins,_ig_dbins);
     procDyanamicBins(_ill_bins,_ill_dbins);
     procStaticBins(_bins,_sbins,_sbinsNum);
-    procStaticBins(_ig_bins,_ig_sbins,_ig_sbinsNum);
+    // procStaticBins(_ig_bins,_ig_sbins,_ig_sbinsNum);
     procStaticBins(_ill_bins,_ill_sbins,_ill_sbinsNum);
+    procIgnoreBins();
     _inst_hits.length = _bins.length; 
   }
   // the number of bins and which one is hit is made out by the
@@ -1167,8 +1188,8 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   Bin!(T)[] _sbins;
   Bin!(T)[] _dbins;
   Bin!(T)[] _ig_bins;
-  Bin!(T)[] _ig_sbins;
-  Bin!(T)[] _ig_dbins;
+  // Bin!(T)[] _ig_sbins;
+  // Bin!(T)[] _ig_dbins;
   Bin!(T)[] _ill_bins;
   Bin!(T)[] _ill_sbins;
   Bin!(T)[] _ill_dbins;
@@ -1214,6 +1235,19 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   // import std.stdio;
 
   import std.conv;
+  void procIgnoreBins(){
+    if (_ig_bins.length == 0){
+      return;
+    }
+    while (_ig_bins.length > 1){
+      _ig_bins[$-2].or(_ig_bins[$-1]);
+      _ig_bins.length --;
+    }
+    _ig_bins[0].negateBin();
+    foreach (ref bin; _bins){
+      bin.and(_ig_bins[0][]);
+    }
+  }
   void procDyanamicBins(ref Bin!(T) [] alias_bins, ref Bin!(T) [] alias_dbins){
     foreach(tempBin; alias_dbins ){
       auto ranges = tempBin.getRanges();
@@ -1501,7 +1535,7 @@ unittest {
       bins d = { [1000:$] };
       bins e = { 125 };
       ignore_bins []a = { 5 , [20:30] };
-      illegal_bins [3]b = { [5:35] };
+      ignore_bins [3]b = { [100:104] };
       //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
     })();
   import std.stdio;
@@ -1607,7 +1641,7 @@ unittest{
 unittest {
   int a;
   auto x = new CoverPoint!(a, q{
-      bins a = {1 , 2 , $0}  ;
+      bins a = {1 , 4 , $0}  ;
 
     }, 3)();
   import std.stdio;
