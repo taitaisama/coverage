@@ -214,12 +214,22 @@ struct parser (T){
     }
     return start;
   }
-  void parseBinDeclaration(){
+  string parseBinDeclaration(){
     parseSpace();
-    if(BINS[srcCursor] != 'b' || BINS[srcCursor+1] != 'i' || BINS[srcCursor+2] != 'n' ||BINS[srcCursor+3] != 's'){
-      assert(false, "error in writing bins at line " ~ srcLine.to!string);
+    if(srcCursor + 4 < BINS.length && BINS[srcCursor] == 'b' && BINS[srcCursor+1] == 'i' && BINS[srcCursor+2] == 'n' && BINS[srcCursor+3] == 's'){
+      srcCursor += 4;
+      return "";
     }
-    srcCursor += 4;
+    else if(srcCursor + 11 < BINS.length && BINS[srcCursor .. srcCursor + 11] == "ignore_bins"){
+      srcCursor += 11;
+      return "_ig";
+    }
+    else if(srcCursor + 12 < BINS.length && BINS[srcCursor .. srcCursor + 12] == "illegal_bins"){
+      srcCursor += 12;
+      return "_ill";
+    }
+    else
+      assert(false, "error in writing bins at line " ~ srcLine.to!string);
     //return start;
   }
   size_t parseSpace() {
@@ -408,61 +418,65 @@ struct parser (T){
     }
   }
 
+  void parseBinOfType(string type){
+    BinType bintype = parseType();
+    if(bintype == BinType.SINGLE){
+      auto srcTag = parseName();
+      string name = BINS[srcTag .. srcCursor];
+      parseSpace();
+      parseEqual();
+      parseSpace();
+      parseCurlyOpen();
+      parseSpace();
+      fill(type ~ "_bins ~= Bin!T( \"" ~ name ~ "\");\n");
+      parseBin(type ~ "_bins");
+    }
+    else if(bintype == BinType.DYNAMIC) {
+      parseSpace();
+      auto srcTag = parseName();
+      fill(type ~ "_dbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+      parseSpace();
+      parseEqual();
+      parseSpace();
+      parseCurlyOpen();
+      parseSpace();
+      parseBin(type ~ "_dbins");
+    }
+    else {
+      auto srcTag = parseLiteral();
+      string arrSize = BINS[srcTag .. srcCursor];
+      parseSpace();
+      if(BINS[srcCursor] != ']'){
+        assert(false, "error in writing bins at line "~ srcLine.to!string);
+      }
+      ++srcCursor;
+      parseSpace();
+      srcTag = parseName();
+      fill(type ~ "_sbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+      fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
+      parseSpace();
+      parseEqual();
+      parseSpace();
+      parseCurlyOpen();
+      parseSpace();
+      parseBin(type ~ "_sbins");
+    }
+    ++srcCursor;
+    parseSpace();
+    if(BINS[srcCursor] != ';'){
+      import std.stdio;
+      writeln("hello");
+      assert(false, "';' expected, not found at line " ~ srcLine.to!string);
+    }
+    ++srcCursor;
+    parseSpace();
+  }
+
   string parse(){
     parseSpace();
     while(srcCursor < BINS.length){
-      parseBinDeclaration();
-      BinType bintype = parseType();
-      if(bintype == BinType.SINGLE){
-        auto srcTag = parseName();
-        string name = BINS[srcTag .. srcCursor];
-        parseSpace();
-        parseEqual();
-        parseSpace();
-        parseCurlyOpen();
-        parseSpace();
-        fill("_bins ~= Bin!T( \"" ~ name ~ "\");\n");
-        parseBin("_bins");
-      }
-      else if(bintype == BinType.DYNAMIC) {
-        parseSpace();
-        auto srcTag = parseName();
-        fill("_dbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
-        parseSpace();
-        parseEqual();
-        parseSpace();
-        parseCurlyOpen();
-        parseSpace();
-        parseBin("_dbins");
-      }
-      else {
-        auto srcTag = parseLiteral();
-        string arrSize = BINS[srcTag .. srcCursor];
-        parseSpace();
-        if(BINS[srcCursor] != ']'){
-          assert(false, "error in writing bins at line "~ srcLine.to!string);
-        }
-        ++srcCursor;
-        parseSpace();
-        srcTag = parseName();
-        fill("_sbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
-        fill("_sbinsNum ~= " ~ arrSize ~ "; \n");
-        parseSpace();
-        parseEqual();
-        parseSpace();
-        parseCurlyOpen();
-        parseSpace();
-        parseBin("_sbins");
-      }
-      ++srcCursor;
-      parseSpace();
-      if(BINS[srcCursor] != ';'){
-        import std.stdio;
-        writeln("hello");
-        assert(false, "';' expected, not found at line " ~ srcLine.to!string);
-      }
-      ++srcCursor;
-      parseSpace();
+      string type = parseBinDeclaration();
+      parseBinOfType(type); 
     }
     return outBuffer;
   }
@@ -887,18 +901,28 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
     }
     writeln(doParse!T(BINS));
 
-    procDyanamicBins();
-    procStaticBins();
+    procDyanamicBins(_bins,_dbins);
+    procDyanamicBins(_ig_bins,_ig_dbins);
+    procDyanamicBins(_ill_bins,_ill_dbins);
+    procStaticBins(_bins,_sbins,_sbinsNum);
+    procStaticBins(_ig_bins,_ig_sbins,_ig_sbinsNum);
+    procStaticBins(_ill_bins,_ill_sbins,_ill_sbinsNum);
     _inst_hits.length = _bins.length; 
   }
   // the number of bins and which one is hit is made out by the
   // sample function
   size_t [] _sbinsNum;
+  size_t [] _ig_sbinsNum;
+  size_t [] _ill_sbinsNum;
   Bin!(T)[] _bins;
   Bin!(T)[] _sbins;
   Bin!(T)[] _dbins;
-  Bin!(T)[] _igbins;
-  Bin!(T)[] _ilbins;
+  Bin!(T)[] _ig_bins;
+  Bin!(T)[] _ig_sbins;
+  Bin!(T)[] _ig_dbins;
+  Bin!(T)[] _ill_bins;
+  Bin!(T)[] _ill_sbins;
+  Bin!(T)[] _ill_dbins;
   uint _defaultCount;
   // We keep a count of how many times a bin is hit
   int _pos;	     // position of t the covergoup; -1 otherwise
@@ -941,32 +965,32 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
   import std.stdio;
 
   import std.conv;
-  void procDyanamicBins(){
-    foreach(tempBin; _dbins){
+  void procDyanamicBins(ref Bin!(T) [] alias_bins, ref Bin!(T) [] alias_dbins){
+    foreach(tempBin; alias_dbins ){
       auto ranges = tempBin.getRanges();
       size_t num = 0;
       for(size_t i = 0; i < ranges.length; i++){
         for(T j = ranges[i]._min; j <= ranges[i]._max; j++){
           string tempname = tempBin.getName ~ "[" ~ to!string(num) ~ "]";
-          _bins ~= Bin!T(tempname);
-          _bins[$ - 1].addRange(j);
+          alias_bins ~= Bin!T(tempname); 
+          alias_bins[$ - 1].addRange(j);
           ++num;
         }
       }
     }
-    _dbins.length = 0;
+    alias_dbins.length = 0;
   }
-  void procStaticBins(){
-    foreach(index, tempBin; _sbins){
+  void procStaticBins(ref Bin!(T) [] alias_bins, ref Bin!(T) [] alias_sbins, ref size_t [] alias_sbinsNum){
+    foreach(index, tempBin; alias_sbins){
       size_t count = tempBin.count();
       auto ranges = tempBin.getRanges();
-      size_t arrSize = _sbinsNum[index];
+      size_t arrSize = alias_sbinsNum[index];
       T Binsize = to!(T)(count / arrSize);
       T rem = to!(T)(count % arrSize);
       size_t binNum = 0;
       T binleft = Binsize;
       for(size_t i = 0; i < arrSize; i++){
-        _bins ~= Bin!T(tempBin.getName ~ "[" ~ to!string(i) ~ "]");
+        alias_bins ~= Bin!T(tempBin.getName ~ "[" ~ to!string(i) ~ "]");
       }
       if(Binsize == 0){
         assert(false, "array size created more than the number of elements in the array");
@@ -983,22 +1007,21 @@ class CoverPoint(alias t, string BINS="") : coverInterface{
         size_t rangeCount = size_t(ranges[i]._max) - size_t(ranges[i]._min) + 1;
         if(rangeCount > binleft){
           //makeBins ~= 
-          _bins[$ - (arrSize - binNum)].addRange((ranges[i]._min), (ranges[i]._min + binleft - 1));
+          alias_bins[$ - (arrSize - binNum)].addRange((ranges[i]._min), (ranges[i]._min + binleft - 1));
           ranges[i]._min += binleft;
           binleft = 0;
           --i;
         }
         else{
           //makeBins ~= 
-          _bins[$ - (arrSize - binNum)].addRange((ranges[i]._min),  (ranges[i]._max));
+          alias_bins[$ - (arrSize - binNum)].addRange((ranges[i]._min),  (ranges[i]._max));
           binleft -= rangeCount;
         }
       }
     }
-    _sbins.length = 0;
-    _sbinsNum.length = 0;
+    alias_sbins.length = 0;
+    alias_sbinsNum.length = 0;
   }
-
   string describe(){
     string s = "";
     foreach(bin; _bins){
@@ -1225,6 +1248,8 @@ unittest {
       bins [3]c = { 200,201,202,204 };
       bins d = { [1000:$] };
       bins e = { 125 };
+      ignore_bins []a = { 5 , [20:30] };
+      illegal_bins [3]b = { [5:35] };
       //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
     })();
   import std.stdio;
