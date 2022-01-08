@@ -7,7 +7,7 @@
 // Authors:   Puneet Goel <puneet@coverify.com>
 
 module esdl.rand.cover;
-// import std.stdio;
+import std.stdio;
 // Coverage
 //import esdl.rand.misc;
 
@@ -17,6 +17,7 @@ static string doParse(T)(string Bins){
 }
 
 /* enum Type: bool {SINGLE, MULTIPLE}; */
+
 class CoverGroup {
   Parameters option;
   static StaticParameters type_option;
@@ -46,14 +47,14 @@ void sample (T)(T grp) if (is(T: CoverGroup)){
       elem.sample();
     }
   }
- }
+}
 void sample (T)(T grp) if (!is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     static if (is(typeof(elem): CoverGroup)){
       sample(elem);
     }
   }
- }
+}
 double get_coverage (T)(T grp) if (is(T: CoverGroup)){
   double total = 0;
   size_t weightSum = 0;
@@ -62,7 +63,7 @@ double get_coverage (T)(T grp) if (is(T: CoverGroup)){
     weightSum += elem.get_weight();
   }
   return total/weightSum;
- }
+}
 double get_inst_coverage (T)(T grp) if (is(T: CoverGroup)){
   double total = 0;
   size_t weightSum = 0;
@@ -71,17 +72,17 @@ double get_inst_coverage (T)(T grp) if (is(T: CoverGroup)){
     weightSum += elem.get_weight();
   }
   return total/weightSum;
- }
+}
 void start (T)(T grp) if (is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     elem.start();
   }
- }
+}
 void stop (T)(T grp) if (is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     elem.stop();
   }
- }
+}
 struct parser (T){
   import std.conv;
   enum BinType: byte {SINGLE, DYNAMIC, STATIC};
@@ -144,8 +145,8 @@ struct parser (T){
       srcCursor ++;
       parseSpace();
       if(BINS[srcCursor] == ']'){
-	++srcCursor;
-	return BinType.DYNAMIC;
+        ++srcCursor;
+        return BinType.DYNAMIC;
       }
       return BinType.STATIC;
     }
@@ -165,60 +166,60 @@ struct parser (T){
     }
     // look for 0b or 0x
     if (srcCursor + 2 <= BINS.length &&
-	BINS[srcCursor] == '0' &&
-	(BINS[srcCursor+1] == 'x' ||
-	 BINS[srcCursor+1] == 'X')) { // hex numbers
+        BINS[srcCursor] == '0' &&
+        (BINS[srcCursor+1] == 'x' ||
+         BINS[srcCursor+1] == 'X')) { // hex numbers
       srcCursor += 2;
       while (srcCursor < BINS.length) {
-	char c = BINS[srcCursor];
-	if ((c >= '0' && c <= '9') ||
-	    (c >= 'a' && c <= 'f') ||
-	    (c >= 'A' && c <= 'F') ||
-	    (c == '_')) {
-	  ++srcCursor;
-	}
-	else {
-	  break;
-	}
+        char c = BINS[srcCursor];
+        if ((c >= '0' && c <= '9') ||
+            (c >= 'a' && c <= 'f') ||
+            (c >= 'A' && c <= 'F') ||
+            (c == '_')) {
+          ++srcCursor;
+        }
+        else {
+          break;
+        }
       }
     }
     else if (srcCursor + 2 <= BINS.length &&
-	     BINS[srcCursor] == '0' &&
-	     (BINS[srcCursor+1] == 'b' ||
-	      BINS[srcCursor+1] == 'B')) { // binary numbers
+        BINS[srcCursor] == '0' &&
+        (BINS[srcCursor+1] == 'b' ||
+         BINS[srcCursor+1] == 'B')) { // binary numbers
       srcCursor += 2;
       while (srcCursor < BINS.length) {
-	char c = BINS[srcCursor];
-	if ((c == '0' || c == '1' || c == '_')) {
-	  ++srcCursor;
-	}
-	else {
-	  break;
-	}
+        char c = BINS[srcCursor];
+        if ((c == '0' || c == '1' || c == '_')) {
+          ++srcCursor;
+        }
+        else {
+          break;
+        }
       }
     }
     else {			// decimals
       while (srcCursor < BINS.length) {
-	char c = BINS[srcCursor];
-	if ((c >= '0' && c <= '9') ||
-	    (c == '_')) {
-	  ++srcCursor;
-	}
-	else {
-	  break;
-	}
+        char c = BINS[srcCursor];
+        if ((c >= '0' && c <= '9') ||
+            (c == '_')) {
+          ++srcCursor;
+        }
+        else {
+          break;
+        }
       }
     }
     if (srcCursor > start) {
       // Look for long/short specifier
       while (srcCursor < BINS.length) {
-	char c = BINS[srcCursor];
-	if (c == 'L' || c == 'u' ||  c == 'U') {
-	  ++srcCursor;
-	}
-	else {
-	  break;
-	}
+        char c = BINS[srcCursor];
+        if (c == 'L' || c == 'u' ||  c == 'U') {
+          ++srcCursor;
+        }
+        else {
+          break;
+        }
       }
     }
     return start;
@@ -236,6 +237,11 @@ struct parser (T){
       srcCursor += 12;
       return "_ill";
     }
+    else if(srcCursor + 13 < BINS.length && BINS[srcCursor .. srcCursor + 13] == "wildcard bins"){
+      srcCursor += 13;
+      return "wild";
+    }
+      //wildcard bins 
     else
       assert(false, "error in writing bins at line " ~ srcLine.to!string);
     //return start;
@@ -251,10 +257,10 @@ struct parser (T){
       parseWhiteSpace();
 
       if (srcCursor > srcTag) {
-	continue;
+        continue;
       }
       else {
-	break;
+        break;
       }
     }
     return start;
@@ -267,10 +273,10 @@ struct parser (T){
       parseBlockComment();
       parseNestedComment();
       if (srcCursor > srcTag) {
-	continue;
+        continue;
       }
       else {
-	break;
+        break;
       }
     }
     return start;
@@ -282,11 +288,11 @@ struct parser (T){
       // eat up whitespaces
       if (c is '\n') ++srcLine;
       if (c is ' ' || c is '\n' || c is '\t' || c is '\r' || c is '\f') {
-	++srcCursor;
-	continue;
+        ++srcCursor;
+        continue;
       }
       else {
-	break;
+        break;
       }
     }
     return start;
@@ -295,20 +301,20 @@ struct parser (T){
   size_t parseLineComment() {
     size_t start = srcCursor;
     if (srcCursor >= BINS.length - 2 ||
-	BINS[srcCursor] != '/' || BINS[srcCursor+1] != '/') return start;
+        BINS[srcCursor] != '/' || BINS[srcCursor+1] != '/') return start;
     else {
       srcCursor += 2;
       while (srcCursor < BINS.length) {
-	if (BINS[srcCursor] == '\n') {
-	  break;
-	}
-	else {
-	  if (srcCursor == BINS.length) {
-	    // commment unterminated
-	    assert (false, "Line comment not terminated at line "~ srcLine.to!string);
-	  }
-	}
-	srcCursor += 1;
+        if (BINS[srcCursor] == '\n') {
+          break;
+        }
+        else {
+          if (srcCursor == BINS.length) {
+            // commment unterminated
+            assert (false, "Line comment not terminated at line "~ srcLine.to!string);
+          }
+        }
+        srcCursor += 1;
       }
       srcCursor += 1;
       return start;
@@ -318,20 +324,20 @@ struct parser (T){
   size_t parseBlockComment() {
     size_t start = srcCursor;
     if (srcCursor >= BINS.length - 2 ||
-	BINS[srcCursor] != '/' || BINS[srcCursor+1] != '*') return start;
+        BINS[srcCursor] != '/' || BINS[srcCursor+1] != '*') return start;
     else {
       srcCursor += 2;
       while (srcCursor < BINS.length - 1) {
-	if (BINS[srcCursor] == '*' && BINS[srcCursor+1] == '/') {
-	  break;
-	}
-	else {
-	  if (srcCursor == BINS.length - 1) {
-	    // commment unterminated
-	    assert (false, "Block comment not terminated at line "~ srcLine.to!string);
-	  }
-	}
-	srcCursor += 1;
+        if (BINS[srcCursor] == '*' && BINS[srcCursor+1] == '/') {
+          break;
+        }
+        else {
+          if (srcCursor == BINS.length - 1) {
+            // commment unterminated
+            assert (false, "Block comment not terminated at line "~ srcLine.to!string);
+          }
+        }
+        srcCursor += 1;
       }
       srcCursor += 2;
       return start;
@@ -341,63 +347,63 @@ struct parser (T){
     size_t srcTag;
     while(true){
       if(BINS[srcCursor] == '['){
-	++srcCursor;
-	parseSpace();
-	srcTag = parseLiteral();
-	string min;
-	if(BINS[srcTag .. srcCursor] == "$"){
-	  min = T.max.stringof;
-	}
-	else if (BINS[srcTag] == '$'){
-	  min = "N["~BINS[srcTag+1 .. srcCursor]~"]";
-	}
-	else {
-	  min = BINS[srcTag .. srcCursor];
-	}
-	//min = to!T(BINS[srcTag .. srcCursor]);
-	parseSpace();
-	bool isInclusive = parseRangeType();
-	parseSpace();
-	srcTag = parseLiteral();
-	string max;
-	if(BINS[srcTag .. srcCursor] == "$"){
-	  max = T.max.stringof;
-	}
-	else if (BINS[srcTag] == '$'){
-	  max = "N["~BINS[srcTag+1 .. srcCursor]~"]";
-	}
-	else{
-	  max = BINS[srcTag .. srcCursor];
-	}
-	if(!isInclusive){
-	  max ~= "-1";
-	}
-	fill(BinType ~"[$-1].addRange(" ~ min ~ ", " ~ max ~ ");\n");
-	parseSpace();
-	if(BINS[srcCursor] != ']'){
-	  assert(false, "range not ended after two elements at line "~ srcLine.to!string);
-	}
-	++srcCursor;
-	parseSpace();
+        ++srcCursor;
+        parseSpace();
+        srcTag = parseLiteral();
+        string min;
+        if(BINS[srcTag .. srcCursor] == "$"){
+          min = T.max.stringof;
+        }
+        else if (BINS[srcTag] == '$'){
+          min = "N["~BINS[srcTag+1 .. srcCursor]~"]";
+        }
+        else {
+          min = BINS[srcTag .. srcCursor];
+        }
+        //min = to!T(BINS[srcTag .. srcCursor]);
+        parseSpace();
+        bool isInclusive = parseRangeType();
+        parseSpace();
+        srcTag = parseLiteral();
+        string max;
+        if(BINS[srcTag .. srcCursor] == "$"){
+          max = T.max.stringof;
+        }
+        else if (BINS[srcTag] == '$'){
+          max = "N["~BINS[srcTag+1 .. srcCursor]~"]";
+        }
+        else{
+          max = BINS[srcTag .. srcCursor];
+        }
+        if(!isInclusive){
+          max ~= "-1";
+        }
+        fill(BinType ~"[$-1].addRange(" ~ min ~ ", " ~ max ~ ");\n");
+        parseSpace();
+        if(BINS[srcCursor] != ']'){
+          assert(false, "range not ended after two elements at line "~ srcLine.to!string);
+        }
+        ++srcCursor;
+        parseSpace();
       }
       else{
-	srcTag = parseLiteral();
-	string val;
-	if(BINS[srcTag .. srcCursor] == "$"){
-	  val = T.max.stringof;
-	}
-	else if (BINS[srcTag] == '$'){
-	  val = "N["~BINS[srcTag+1 .. srcCursor]~"]";
-	}
-	else{
-	  val = BINS[srcTag .. srcCursor];
-	}
-	//makeBins ~= 
-	fill(BinType ~ "[$-1].addRange(" ~ val ~ ");\n");
-	parseSpace();
+        srcTag = parseLiteral();
+        string val;
+        if(BINS[srcTag .. srcCursor] == "$"){
+          val = T.max.stringof;
+        }
+        else if (BINS[srcTag] == '$'){
+          val = "N["~BINS[srcTag+1 .. srcCursor]~"]";
+        }
+        else{
+          val = BINS[srcTag .. srcCursor];
+        }
+        //makeBins ~= 
+        fill(BinType ~ "[$-1].addRange(" ~ val ~ ");\n");
+        parseSpace();
       }
       if(BINS[srcCursor] == '}'){
-	break;
+        break;
       }
       parseComma();
     }
@@ -407,28 +413,28 @@ struct parser (T){
     size_t nesting = 0;
     size_t start = srcCursor;
     if (srcCursor >= BINS.length - 2 ||
-	BINS[srcCursor] != '/' || BINS[srcCursor+1] != '+') return start;
+        BINS[srcCursor] != '/' || BINS[srcCursor+1] != '+') return start;
     else {
       srcCursor += 2;
       while (srcCursor < BINS.length - 1) {
-	if (BINS[srcCursor] == '/' && BINS[srcCursor+1] == '+') {
-	  nesting += 1;
-	  srcCursor += 1;
-	}
-	else if (BINS[srcCursor] == '+' && BINS[srcCursor+1] == '/') {
-	  if (nesting == 0) {
-	    break;
-	  }
-	  else {
-	    nesting -= 1;
-	    srcCursor += 1;
-	  }
-	}
-	srcCursor += 1;
-	if (srcCursor >= BINS.length - 1) {
-	  // commment unterminated
-	  assert (false, "Block comment not terminated at line "~ srcLine.to!string);
-	}
+        if (BINS[srcCursor] == '/' && BINS[srcCursor+1] == '+') {
+          nesting += 1;
+          srcCursor += 1;
+        }
+        else if (BINS[srcCursor] == '+' && BINS[srcCursor+1] == '/') {
+          if (nesting == 0) {
+            break;
+          }
+          else {
+            nesting -= 1;
+            srcCursor += 1;
+          }
+        }
+        srcCursor += 1;
+        if (srcCursor >= BINS.length - 1) {
+          // commment unterminated
+          assert (false, "Block comment not terminated at line "~ srcLine.to!string);
+        }
       }
       srcCursor += 2;
       return start;
@@ -452,10 +458,10 @@ struct parser (T){
       parseSpace();
       auto srcTag = parseName();
       if (type == "_ig"){
-	fill(type ~ "_bins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");	
+        fill(type ~ "_bins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");	
       }
       else {
-	fill(type ~ "_dbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+        fill(type ~ "_dbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
       }
       parseSpace();
       parseEqual();
@@ -463,10 +469,10 @@ struct parser (T){
       parseCurlyOpen();
       parseSpace();
       if (type == "_ig"){
-	parseBin(type ~ "_bins");
+        parseBin(type ~ "_bins");
       }
       else {
-	parseBin(type ~ "_dbins");
+        parseBin(type ~ "_dbins");
       }
     }
     else {
@@ -480,12 +486,12 @@ struct parser (T){
       parseSpace();
       srcTag = parseName();
       if (type == "_ig"){ //no need for arrays in ignore bins
-	fill(type ~ "_bins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
-	// fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
+        fill(type ~ "_bins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+        // fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
       }
       else {
-	fill(type ~ "_sbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
-	fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
+        fill(type ~ "_sbins ~= Bin!T( \"" ~ BINS[srcTag .. srcCursor] ~ "\");\n");
+        fill(type ~ "_sbinsNum ~= " ~ arrSize ~ "; \n");
       }
       parseSpace();
       parseEqual();
@@ -493,12 +499,43 @@ struct parser (T){
       parseCurlyOpen();
       parseSpace();
       if (type == "_ig"){
-	parseBin(type ~ "_bins");
+        parseBin(type ~ "_bins");
       }
       else {
-	parseBin(type ~ "_sbins");
+        parseBin(type ~ "_sbins");
       }
     }
+    ++srcCursor;
+    parseSpace();
+    if(BINS[srcCursor] != ';'){
+      assert(false, "';' expected, not found at line " ~ srcLine.to!string);
+    }
+    ++srcCursor;
+    parseSpace();
+  }
+  void parseWildcardBins(){
+    parseSpace();
+    auto srcTag = parseName();
+    string name = BINS[srcTag .. srcCursor];
+    parseSpace();
+    parseEqual();
+    parseSpace();
+    parseCurlyOpen();
+    parseSpace();
+    while(srcCursor < BINS.length && BINS[srcCursor] != 'b')
+      srcCursor++;
+    srcCursor++;
+    srcTag = srcCursor;
+    /* char [] possible_chars = ['1', '0', '?', 'x', 'z']; */
+    while(srcTag < BINS.length && (BINS[srcTag] == '1' || BINS[srcTag] == '0' || BINS[srcTag] == '?' || BINS[srcTag] == 'x' || BINS[srcTag] == 'z') ){
+      srcTag++;
+    }
+    if(srcTag == BINS.length){
+        assert(false, "incomplete statement");
+    }
+    fill("_wildbins ~= WildCardBin!(T)( \"" ~ name ~ "\", \"" ~ BINS[srcCursor .. srcTag] ~ "\" );\n"); 
+    srcCursor = srcTag;
+    parseSpace();
     ++srcCursor;
     parseSpace();
     if(BINS[srcCursor] != ';'){
@@ -526,11 +563,15 @@ struct parser (T){
     parseSpace();
     while(srcCursor < BINS.length){
       if (isTypeStatement()){
-	fillTillEnd();
+	       fillTillEnd();
       }
       else {
-	string type = parseBinDeclaration();
-	parseBinOfType(type);
+        string type = parseBinDeclaration();
+        if(type == "wild"){
+          parseWildcardBins();
+        }
+        else
+          parseBinOfType(type); 
       }
       parseSpace();
     }
@@ -551,6 +592,38 @@ struct parser (T){
 //   T _min;
 //   T _max;
 // };
+
+struct WildCardBin(T){
+  import std.conv;
+  string _bin;
+  string _name;
+  size_t _hits = 0;
+  T _ones = 0, _zeroes = 0;
+  this(string word, string num){
+    _bin = num;
+    _name = word;
+    int p = 1, i = _bin.length.to!int() - 1;
+    writeln(i);
+    while(i >= 0){
+      if(_bin[i] == '1'){
+        _ones += p;
+      }
+      else if(_bin[i] == '0'){
+        _zeroes += p;
+      }
+      p *= 2;
+      i -= 1;
+    }
+  }
+  bool checkHit(T val){
+    if((val & _ones) == _ones && (val & _zeroes) == 0){
+      return true;
+    }
+    else 
+      return false;
+  }
+
+}
 
 struct Bin(T)
 {
@@ -589,7 +662,7 @@ struct Bin(T)
   //   return mid;
   // }
   size_t binarySearch (T val){ // lower_bound, first element greater than or equal to
-    
+
     size_t count = _ranges.length, step;
     size_t first = 0, last = _ranges.length, it;
     while (count > 0){
@@ -597,11 +670,11 @@ struct Bin(T)
       step = count / 2;
       it += step;
       if (_ranges[it] < val){
-	first = ++it;
-	count -= step + 1;
+        first = ++it;
+        count -= step + 1;
       }
       else {
-	count = step;
+        count = step;
       }
     }
     return first;
@@ -625,23 +698,23 @@ struct Bin(T)
     T [] b = [min, max];
     or(b);
   }
-  
+
   bool fallsIn(T x, T [] a, size_t pos){
     for (size_t i = pos; i < a.length; i++){
       T elem = a[i];
       if (x < elem){
-	if (i % 2==0){
-	  return false;
-	}
-	return true;
+        if (i % 2==0){
+          return false;
+        }
+        return true;
       }
       if (x == elem){
-	return true;
+        return true;
       }
     }
     return false;
   }
-  
+
   void or (Bin!T other){
     or(other._ranges);
   }
@@ -664,7 +737,7 @@ struct Bin(T)
   size_t opDollar() const @safe nothrow{
     return _ranges.length;
   }
-  
+
   void negateBin(){
     // if (isEmpty()){
     //   T[2] temp = [T.min, T.max];
@@ -677,7 +750,7 @@ struct Bin(T)
     else {
       this ~= _ranges[$-1];
       for (size_t i = _ranges.length-2; i > 0; --i){
-	_ranges[i] = _ranges[i-1];
+        _ranges[i] = _ranges[i-1];
       }
       _ranges[0] = T.max;
     }
@@ -689,10 +762,10 @@ struct Bin(T)
     }
     for (size_t i = 0; i < _ranges.length; ++i){
       if (i % 2 == 0){
-	_ranges[i] ++;
+        _ranges[i] ++;
       }
       else {
-	_ranges[i] --;
+        _ranges[i] --;
       }
     }
     // if (_first == _last){
@@ -705,97 +778,97 @@ struct Bin(T)
     size_t len = _ranges.length;
     while (a1 < len || b1 < b.length){
       if (a1 >= len){
-	size_t temp = this.length - len;
-	if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == b[b1]-1)||(this[$-1] == b[b1]))){
-	  this.del(1);
-	  b1 ++;
-	}
-	while (b1 < b.length){
-	  this ~= b[b1];
-	  b1++;
-	}
-	continue;
+        size_t temp = this.length - len;
+        if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == b[b1]-1)||(this[$-1] == b[b1]))){
+          this.del(1);
+          b1 ++;
+        }
+        while (b1 < b.length){
+          this ~= b[b1];
+          b1++;
+        }
+        continue;
       }
       else if (b1 >= b.length){
-	size_t temp = this.length - len;
-	if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == this[a1]-1)||(this[$-1] == this[a1]))){
-	  this.del(1);
-	  a1 ++;
-	}
-	while (a1 < len){
-	  this ~= this[a1];
-	  a1++;
-	}
-	continue;
+        size_t temp = this.length - len;
+        if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == this[a1]-1)||(this[$-1] == this[a1]))){
+          this.del(1);
+          a1 ++;
+        }
+        while (a1 < len){
+          this ~= this[a1];
+          a1++;
+        }
+        continue;
       }
       if (this[a1] < b[b1]){
-	if (!fallsIn(this[a1], b, b1)){
-	  size_t temp = this.length - len;
-	  if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == this[a1]-1)||(this[$-1] == this[a1]-1))){
-	    this.del(1);
-	  }
-	  else {
-	    this ~= this[a1];
-	  }
-	}
-	a1++;
+        if (!fallsIn(this[a1], b, b1)){
+          size_t temp = this.length - len;
+          if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == this[a1]-1)||(this[$-1] == this[a1]-1))){
+            this.del(1);
+          }
+          else {
+            this ~= this[a1];
+          }
+        }
+        a1++;
       }
       else if (this[a1] > b[b1]){
-	if (!fallsIn(b[b1], this[], a1)){
-	  size_t temp = this.length - len;
-	  if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == b[b1] -1)||(this[$-1] == b[b1]))){
-	    this.del(1);
-	  }
-	  else {
-	    this ~= b[b1];
-	  }
-	}
-	b1++;
+        if (!fallsIn(b[b1], this[], a1)){
+          size_t temp = this.length - len;
+          if ((temp != 0) && (temp % 2 == 0) && ((this[$-1] == b[b1] -1)||(this[$-1] == b[b1]))){
+            this.del(1);
+          }
+          else {
+            this ~= b[b1];
+          }
+        }
+        b1++;
       }
       else {
-	if ((a1+b1)%2==0){
-	  this ~= this[a1];
-	  a1++;
-	  b1++;
-	}
-	else {
-	  a1++;
-	  b1++;
-	}
+        if ((a1+b1)%2==0){
+          this ~= this[a1];
+          a1++;
+          b1++;
+        }
+        else {
+          a1++;
+          b1++;
+        }
       }
     }
     this.slice(len, _ranges.length);
   }
-  
+
   void and(T [] b){
     size_t a1 = 0;
     size_t b1 = 0;
     size_t len = _ranges.length;
     while (a1 != len && b1 != b.length){
       if (this[a1] < b[b1]){
-	if (fallsIn(this[a1], b, b1)){
-	  this ~= this[a1];
-	}
-	a1++;
+        if (fallsIn(this[a1], b, b1)){
+          this ~= this[a1];
+        }
+        a1++;
       }
       else if (this[a1] > b[b1]){
-	if (fallsIn(b[b1], this[], a1)){
-	  this ~= b[b1];
-	}
-	b1++;
+        if (fallsIn(b[b1], this[], a1)){
+          this ~= b[b1];
+        }
+        b1++;
       }
       else {
-	if ((a1+b1)%2==0){
-	  this ~= this[a1];
-	  a1++;
-	  b1++;
-	}
-	else {
-	  this ~= this[a1];
-	  this ~= this[a1];
-	  a1++;
-	  b1++;
-	}
+        if ((a1+b1)%2==0){
+          this ~= this[a1];
+          a1++;
+          b1++;
+        }
+        else {
+          this ~= this[a1];
+          this ~= this[a1];
+          a1++;
+          b1++;
+        }
       }
     }
     this.slice(len, _ranges.length);
@@ -891,7 +964,7 @@ struct Bin(T)
   //     _ranges = _ranges[1 .. $];
   //   }
   // }
-  
+
   string describe()
   {
     import std.conv;
@@ -902,9 +975,9 @@ struct Bin(T)
     /* } */
     /* s ~= "Multiple : \n"; */
     foreach (elem; _ranges)
-      {
-	s ~= to!string(elem) ~ ", ";
-      }
+    {
+      s ~= to!string(elem) ~ ", ";
+    }
     s ~= "\n";
     return s;
   }
@@ -1191,6 +1264,7 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   alias T = typeof(t);
   string outBuffer;
   bool [] _inst_hits;
+  bool [] _inst_wild_hits;
   size_t _num_hits;
   size_t _num_inst_hits;
   Parameters option;
@@ -1215,6 +1289,7 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
     procStaticBins(_ill_bins,_ill_sbins,_ill_sbinsNum);
     procIgnoreBins();
     _inst_hits.length = _bins.length; 
+    _inst_wild_hits.length = _wildbins.length;
   }
   // the number of bins and which one is hit is made out by the
   // sample function
@@ -1230,6 +1305,7 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   Bin!(T)[] _ill_bins;
   Bin!(T)[] _ill_sbins;
   Bin!(T)[] _ill_dbins;
+  WildCardBin!(T)[] _wildbins;
   uint _defaultCount;
   // We keep a count of how many times a bin is hit
   int _pos;	     // position of t the covergoup; -1 otherwise
@@ -1268,7 +1344,7 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   auto getBins() {
     return _bins;
   }
-  
+
   // import std.stdio;
 
   import std.conv;
@@ -1317,13 +1393,13 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
       }
       for(size_t i = 0; i < ranges.length-1; i+=2){
         if(binleft == 0){
-    	  binNum ++;
-    	  assert(binNum < arrSize);
-    	  if(binNum == arrSize - rem){
-    	    Binsize ++;
-    	  }
-    	  binleft = Binsize;
-    	}
+          binNum ++;
+          assert(binNum < arrSize);
+          if(binNum == arrSize - rem){
+            Binsize ++;
+          }
+          binleft = Binsize;
+        }
         size_t rangeCount = size_t(ranges[i+1]) - size_t(ranges[i]) + 1;
         if(rangeCount > binleft){
           //makeBins ~= 
@@ -1358,14 +1434,25 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
     foreach(i, ref bin;_bins){
       _inst_hits[i] = false;
       if(bin.checkHit(t)){
-	if (bin._hits == 0){
-	  _num_hits ++;
-	}
+        if (bin._hits == 0){
+          _num_hits ++;
+        }
         bin._hits++;
         _inst_hits[i] = true;
-	_num_inst_hits ++;
+        _num_inst_hits ++;
       }
     } 
+    foreach(i, ref wbin; _wildbins){
+      _inst_wild_hits[i] = false;
+      if(wbin.checkHit(t)){
+        if(wbin._hits == 0){
+          _num_hits++;
+        }
+        wbin._hits++;
+        _inst_wild_hits[i] = true;
+        _num_inst_hits++;
+      }
+    }
   }
   override double get_coverage(){
     return cast(double)(_num_hits)/_bins.length;
@@ -1541,7 +1628,7 @@ unittest {
   auto x = new CoverPoint!(p, q{
       bins a = {     1 , 2 }  ;
 
-    })();
+      })();
   import std.stdio;
   writeln(x.describe()); 
   //x.print();
@@ -1574,7 +1661,7 @@ unittest {
       ignore_bins []a = { 5 , [20:30] };
       ignore_bins [3]b = { [100:104] };
       //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
-    })();
+      })();
   import std.stdio;
   writeln(x.describe()); 
   //import std.stdio;
@@ -1592,7 +1679,7 @@ unittest {
   int p;
   auto x = new CoverPoint!(p, q{
       bins [32] a = {[-2147483647:2147483647]};
-    })();
+      })();
   import std.stdio;
   writeln(x.describe());
 }
@@ -1604,7 +1691,7 @@ unittest{
     })();
   auto cp2 = new CoverPoint!(a, q{
       bins [] cp2 = {4,5};
-    })();
+      })();
   auto x = new Cross!(cp, cp2)();
   import std.stdio;
   writeln(cp.option.weight);
@@ -1669,9 +1756,9 @@ unittest{
   auto x = new CoverPoint!(a, q{
       bins x1 = {1,2,3};
       bins x2 = {1};
-    })();
+      })();
 
-  
+
   auto xb = new Cross!(x,b)();
   x.sample();
   xb.sample();
@@ -1679,12 +1766,17 @@ unittest{
   /* assert(); */
 }
 unittest {
-  int a;
+  int a = 13;
   auto x = new CoverPoint!(a, q{
       bins a = {1 , 4 , $0}  ;
-
-    }, 3)();
+      wildcard bins abx = { 4ab11?? };
+      }, 3)();
   import std.stdio;
+  for(int i = 12; i < 16; i++){
+    a = i;
+    x.sample();
+    assert(x._inst_wild_hits[0]);
+  }
   writeln(x.describe());
 }
 
@@ -1697,3 +1789,4 @@ unittest {
 //   a.addRange(11, 14);
 //   writeln(a.describe());
 // }
+
