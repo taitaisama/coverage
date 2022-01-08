@@ -17,8 +17,10 @@ static string doParse(T)(string Bins){
 }
 
 /* enum Type: bool {SINGLE, MULTIPLE}; */
-interface CoverGroup {
 
+class CoverGroup {
+  Parameters option;
+  static StaticParameters type_option;
 }
 // string Initialise (T)(T grp) if (is(T: CoverGroup)){
 //   import std.typecons: Tuple;
@@ -223,7 +225,6 @@ struct parser (T){
     return start;
   }
   string parseBinDeclaration(){
-    parseSpace();
     if(srcCursor + 4 < BINS.length && BINS[srcCursor] == 'b' && BINS[srcCursor+1] == 'i' && BINS[srcCursor+2] == 'n' && BINS[srcCursor+3] == 's'){
       srcCursor += 4;
       return "";
@@ -543,15 +544,36 @@ struct parser (T){
     ++srcCursor;
     parseSpace();
   }
+  bool isTypeStatement(){
+    if (BINS[srcCursor] == 'o' || BINS[srcCursor] == 't'){
+      return true;
+    }
+    return false;
+  }
+  void fillTillEnd(){
+    size_t srcTag = srcCursor;
+    while (BINS[srcCursor] != ';'){
+      srcCursor ++;
+    }
+    srcCursor++;
+    fill(BINS[srcTag .. srcCursor]);
+    fill("\n");
+  }
   string parse(){
     parseSpace();
     while(srcCursor < BINS.length){
-      string type = parseBinDeclaration();
-      if(type == "wild"){
-        parseWildcardBins();
+      if (isTypeStatement()){
+	       fillTillEnd();
       }
-      else
-        parseBinOfType(type); 
+      else {
+        string type = parseBinDeclaration();
+        if(type == "wild"){
+          parseWildcardBins();
+        }
+        else
+          parseBinOfType(type); 
+      }
+      parseSpace();
     }
     return outBuffer;
   }
@@ -657,6 +679,7 @@ struct Bin(T)
     }
     return first;
   }
+  
   bool checkHit(T val){
     if (val < _ranges[0] || val > _ranges[$-1]){
       return false;
@@ -1216,6 +1239,20 @@ class Cross ( N... ): coverInterface{
 //   }
 // }
 
+struct Parameters {
+  size_t weight = 1;
+  size_t goal = 90;
+  size_t at_least = 1;
+  size_t auto_bin_max = 64;
+  size_t corss_auto_bin_max = size_t.max;
+  string comment = "";
+}
+struct StaticParameters {
+  size_t weight = 1;
+  size_t goal = 90;
+  string comment = "";
+}
+
 class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   import std.traits: isIntegral;
   // import esdl.data.bvec: isBitVector;
@@ -1230,6 +1267,8 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   bool [] _inst_wild_hits;
   size_t _num_hits;
   size_t _num_inst_hits;
+  Parameters option;
+  static StaticParameters type_option;
   this (){
 
     // import std.stdio;
@@ -1648,11 +1687,14 @@ unittest{
   int a = 5, d = 3;
   auto cp = new CoverPoint!(d, q{
       bins [2] a = {2,3};
-      })();
+      option.weight = 4;
+    })();
   auto cp2 = new CoverPoint!(a, q{
       bins [] cp2 = {4,5};
       })();
   auto x = new Cross!(cp, cp2)();
+  import std.stdio;
+  writeln(cp.option.weight);
   /* writeln(cp.describe()); */
   /* writeln(cp2.describe()); */
   cp.sample();
