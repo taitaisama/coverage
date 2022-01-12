@@ -535,20 +535,41 @@ struct parser (T){
     }
     return false;
   }
-  void fillTillEnd(){
+  void parseTillEqual(){
     size_t srcTag = srcCursor;
-    while (BINS[srcCursor] != ';'){
+    while (BINS[srcCursor] != '='){
       srcCursor ++;
     }
     srcCursor++;
     fill(BINS[srcTag .. srcCursor]);
     fill("\n");
   }
+  void parseOption(){
+    parseTillEqual();
+    parseSpace();
+    size_t srcTag = parseLiteral();
+    string val;
+    if(BINS[srcTag .. srcCursor] == "$"){
+      val = T.max.stringof;
+    }
+    else if (BINS[srcTag] == '$'){
+      val = "N["~BINS[srcTag+1 .. srcCursor]~"]";
+    }
+    else{
+      val = BINS[srcTag .. srcCursor];
+    }
+    parseSpace();
+    if(BINS[srcCursor] != ';'){
+      assert(false, "';' expected, not found at line " ~ srcLine.to!string);
+    }
+    fill(val ~ ";");
+    srcCursor++;
+  }
   string parse(){
     parseSpace();
     while(srcCursor < BINS.length){
       if (isTypeStatement()){
-	fillTillEnd();
+	parseOption();
       }
       else {
 	if (parseIsWild()){
@@ -982,12 +1003,10 @@ struct Parameters {
   size_t at_least = 1;
   size_t auto_bin_max = 64;
   size_t corss_auto_bin_max = size_t.max;
-  string comment = "";
 }
 struct StaticParameters {
   size_t weight = 1;
   size_t goal = 90;
-  string comment = "";
 }
 
 class CoverPoint(alias t, string BINS="", N...) : coverInterface{
