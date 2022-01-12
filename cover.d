@@ -16,25 +16,10 @@ static string doParse(T)(string Bins){
   return Parser.parse();
 }
 
-/* enum Type: bool {SINGLE, MULTIPLE}; */
-
 class CoverGroup {
   Parameters option;
   static StaticParameters type_option;
 }
-// string Initialise (T)(T grp) if (is(T: CoverGroup)){
-//   import std.typecons: Tuple;
-//   import std.conv;
-//   auto tup = grp.tupleof;
-//   string str = "";
-//   foreach (i, ref elem; tup){
-//     if (!(elem is null)){
-//       return "";
-//     }
-//     str ~= ("tup["~to!string(i)~"] = new "~typeof(elem).stringof~ "();");
-//   }
-//   return str;
-// }
 
 void sample (T)(T grp) if (is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
@@ -47,14 +32,14 @@ void sample (T)(T grp) if (is(T: CoverGroup)){
       elem.sample();
     }
   }
-}
+ }
 void sample (T)(T grp) if (!is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     static if (is(typeof(elem): CoverGroup)){
       sample(elem);
     }
   }
-}
+ }
 double get_coverage (T)(T grp) if (is(T: CoverGroup)){
   double total = 0;
   size_t weightSum = 0;
@@ -63,7 +48,7 @@ double get_coverage (T)(T grp) if (is(T: CoverGroup)){
     weightSum += elem.get_weight();
   }
   return total/weightSum;
-}
+ }
 double get_inst_coverage (T)(T grp) if (is(T: CoverGroup)){
   double total = 0;
   size_t weightSum = 0;
@@ -72,17 +57,17 @@ double get_inst_coverage (T)(T grp) if (is(T: CoverGroup)){
     weightSum += elem.get_weight();
   }
   return total/weightSum;
-}
+ }
 void start (T)(T grp) if (is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     elem.start();
   }
-}
+ }
 void stop (T)(T grp) if (is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     elem.stop();
   }
-}
+ }
 struct parser (T){
   import std.conv;
   enum BinType: byte {SINGLE, DYNAMIC, STATIC};
@@ -96,8 +81,6 @@ struct parser (T){
     BINS = bins;
   }
   void fill(in string source) {
-    //import std.stdio;
-    //pragma(source);
     outBuffer ~= source;
   }
   void parseComma(){
@@ -184,9 +167,9 @@ struct parser (T){
       }
     }
     else if (srcCursor + 2 <= BINS.length &&
-        BINS[srcCursor] == '0' &&
-        (BINS[srcCursor+1] == 'b' ||
-         BINS[srcCursor+1] == 'B')) { // binary numbers
+	     BINS[srcCursor] == '0' &&
+	     (BINS[srcCursor+1] == 'b' ||
+	      BINS[srcCursor+1] == 'B')) { // binary numbers
       srcCursor += 2;
       while (srcCursor < BINS.length) {
         char c = BINS[srcCursor];
@@ -224,8 +207,16 @@ struct parser (T){
     }
     return start;
   }
+  bool parseIsWild(){
+    if (srcCursor + 8 < BINS.length && BINS[srcCursor .. srcCursor+8] == "wildcard"){
+      srcCursor += 8;
+      parseSpace();
+      return true;
+    }
+    return false;
+  }
   string parseBinDeclaration(){
-    if(srcCursor + 4 < BINS.length && BINS[srcCursor] == 'b' && BINS[srcCursor+1] == 'i' && BINS[srcCursor+2] == 'n' && BINS[srcCursor+3] == 's'){
+    if(srcCursor + 4 < BINS.length && BINS[srcCursor .. srcCursor+4] == "bins"){
       srcCursor += 4;
       return "";
     }
@@ -237,14 +228,8 @@ struct parser (T){
       srcCursor += 12;
       return "_ill";
     }
-    else if(srcCursor + 13 < BINS.length && BINS[srcCursor .. srcCursor + 13] == "wildcard bins"){
-      srcCursor += 13;
-      return "wild";
-    }
-      //wildcard bins 
     else
       assert(false, "error in writing bins at line " ~ srcLine.to!string);
-    //return start;
   }
   size_t parseSpace() {
     size_t start = srcCursor;
@@ -513,7 +498,7 @@ struct parser (T){
     ++srcCursor;
     parseSpace();
   }
-  void parseWildcardBins(){
+  void parseWildcardBins(string type){
     parseSpace();
     auto srcTag = parseName();
     string name = BINS[srcTag .. srcCursor];
@@ -531,9 +516,9 @@ struct parser (T){
       srcTag++;
     }
     if(srcTag == BINS.length){
-        assert(false, "incomplete statement");
+      assert(false, "incomplete statement");
     }
-    fill("_wildbins ~= WildCardBin!(T)( \"" ~ name ~ "\", \"" ~ BINS[srcCursor .. srcTag] ~ "\" );\n"); 
+    fill(type ~ "_wildbins ~= WildCardBin!(T)( \"" ~ name ~ "\", \"" ~ BINS[srcCursor .. srcTag] ~ "\" );\n"); 
     srcCursor = srcTag;
     parseSpace();
     ++srcCursor;
@@ -563,35 +548,23 @@ struct parser (T){
     parseSpace();
     while(srcCursor < BINS.length){
       if (isTypeStatement()){
-	       fillTillEnd();
+	fillTillEnd();
       }
       else {
-        string type = parseBinDeclaration();
-        if(type == "wild"){
-          parseWildcardBins();
-        }
-        else
-          parseBinOfType(type); 
+	if (parseIsWild()){
+	  string type = parseBinDeclaration();
+	  parseWildcardBins(type);
+	}
+	else {
+	  string type = parseBinDeclaration();
+	  parseBinOfType(type);
+	}
       }
       parseSpace();
     }
     return outBuffer;
   }
 }
-
-// struct BinRange(T)
-// {
-//   this (T val){
-//     _min = val;
-//     _max = val;
-//   }
-//   this (T min, T max){
-//     _min = min;
-//     _max = max;
-//   }
-//   T _min;
-//   T _max;
-// };
 
 struct WildCardBin(T){
   import std.conv;
@@ -640,27 +613,6 @@ struct Bin(T)
   ref T opIndex(size_t index){
     return _ranges[index];
   }
-  // size_t binarySearch(T val){
-  //   size_t left = 0, right = _ranges.length - 1, mid = 0;
-  //   while (left <= right)
-  //     {
-  // 	mid = (right + left) / 2;
-  // 	if (val == _ranges[mid]._max)
-  // 	  break;
-  // 	if (val < _ranges[mid]._max){
-  // 	  if(mid == 0){
-  // 	    break;
-  // 	  }
-  // 	  right = mid - 1;
-  // 	}
-  // 	else if (val > _ranges[mid]._max)
-  // 	  left = mid + 1;
-  //     }
-  //   if(_ranges[mid]._max < val){
-  //     mid ++;
-  //   }
-  //   return mid;
-  // }
   size_t binarySearch (T val){ // lower_bound, first element greater than or equal to
 
     size_t count = _ranges.length, step;
@@ -739,11 +691,6 @@ struct Bin(T)
   }
 
   void negateBin(){
-    // if (isEmpty()){
-    //   T[2] temp = [T.min, T.max];
-    //   this ~= temp;
-    //   return;   
-    // }
     if (_ranges[0] == T.min){
       _ranges = _ranges[1 .. $];
     }
@@ -768,9 +715,6 @@ struct Bin(T)
         _ranges[i] --;
       }
     }
-    // if (_first == _last){
-    //   clear();
-    // }
   }
   void or(T [] b){
     size_t a1 = 0;
@@ -873,21 +817,6 @@ struct Bin(T)
     }
     this.slice(len, _ranges.length);
   }
-  // void addRange(T val)
-  // {
-  //   if(_ranges.length == 0){
-  //     _ranges ~= BinRange!T(val);
-  //   }
-  //   auto pos = binarySearch(val);
-  //   if(pos >= _ranges.length){
-  //     _ranges ~= BinRange!T(val);
-  //     return;
-  //   }
-  //   if(_ranges[pos]._min <= val){
-  //     return;
-  //   }
-  //   _ranges = _ranges[0 .. pos] ~ BinRange!T(val) ~ _ranges[pos .. $];
-  // }
   string getName(){
     return _name;    
   }
@@ -895,89 +824,14 @@ struct Bin(T)
     return _ranges;
   }
 
-  // void addRange(T min, T max)
-  // {
-  //   assert(min <= max, "minimum value is greater than maximum in range");
-  //   if(_ranges.length == 0){
-  //     _ranges ~= BinRange!T(min, max);
-  //   }
-  //   auto pos1 = binarySearch(min);
-  //   if(pos1 >= _ranges.length){
-  //     _ranges ~= BinRange!T(min, max);
-  //     return;
-  //   }
-  //   auto pos2 = binarySearch(max);
-  //   if(_ranges[pos1]._min <= min){
-  //     if(pos2 >= _ranges.length){
-  //       auto temp = BinRange!T(_ranges[pos1]._min, max);
-  //       _ranges.length = pos1;
-  //       _ranges ~= temp;
-  //     }
-  //     else{
-  //       if(pos1 == pos2){
-  //         return;
-  //       }
-  //       if(_ranges[pos2]._min <= max){
-  //         auto temp = BinRange!T(_ranges[pos1]._min, _ranges[pos2]._max);
-  //         _ranges = _ranges[0 .. pos1] ~ temp ~ _ranges[pos2+1 .. $];
-  //       }
-  //       else{
-  //         auto temp = BinRange!T(_ranges[pos1]._min, max);
-  //         _ranges = _ranges[0 .. pos1] ~ temp ~ _ranges[pos2 .. $];
-  //       }
-  //     }
-  //   }
-  //   else{
-  //     if(pos2 >= _ranges.length){
-  //       auto temp = BinRange!T(min, max);
-  //       _ranges.length = pos1;
-  //       _ranges ~= temp;
-  //     }
-  //     else{
-  //       if(_ranges[pos2]._min <= max){
-  //         auto temp = BinRange!T(min, _ranges[pos2]._max);
-  //         _ranges = _ranges[0 .. pos1] ~ temp ~ _ranges[pos2+1 .. $];
-  //       }
-  //       else{
-  //         auto temp = BinRange!T(min, max);
-  //         _ranges = _ranges[0 .. pos1] ~ temp ~ _ranges[pos2 .. $];
-  //       }
-  //     }
-  //   }
-  // }
-  // void negateBin(){
-  //   bool firstMin = _ranges[0]._min == T.min;
-  //   auto replace = BinRange!T(T.min, _ranges[0]._min-1);
-  //   for (int i = 0; i < _ranges.length-1; i ++){
-  //     auto newReplace = BinRange!T(_ranges[i]._max+1, _ranges[i+1]._min-1);
-  //     _ranges[i] = replace;
-  //     replace = newReplace;
-  //   }
-  //   if (_ranges[$-1]._max == T.max){
-  //     _ranges[$-1] = replace;
-  //   }
-  //   else {
-  //     _ranges ~= BinRange!T(_rangs[$-1].max+1, T.max);
-  //     ranges[$-2] = replace;
-  //   }
-  //   if (firstMin){
-  //     _ranges = _ranges[1 .. $];
-  //   }
-  // }
-
   string describe()
   {
     import std.conv;
     string s = "Name : " ~ _name ~ "\n";
-    /* if(_type == Type.SINGLE){ */
-    /*     s ~= "Single : \n"; */
-    /*     return (s ~ to!string(_single) ~ "\n"); */
-    /* } */
-    /* s ~= "Multiple : \n"; */
     foreach (elem; _ranges)
-    {
-      s ~= to!string(elem) ~ ", ";
-    }
+      {
+	s ~= to!string(elem) ~ ", ";
+      }
     s ~= "\n";
     return s;
   }
@@ -988,46 +842,7 @@ struct Bin(T)
     }
     return c;
   }
-  // void normalize(){
-  //   for(size_t i = 0; i < _ranges.length-1; i++){
-  //     assert(_ranges[i]._max < _ranges[i+1]._min && _ranges[i]._max >= _ranges[i]._min);
-  //     if(_ranges[i]._max == _ranges[i+1]._min - 1){
-  //       _ranges[i]._max = _ranges[i+1]._max;
-  //       if(i+2 < _ranges.length){
-  //         _ranges = _ranges[0 .. i+1] ~ _ranges[i+2 .. $];
-  //       }
-  //       else{
-  //         _ranges = _ranges[0 .. i+1];
-  //       }
-  //     }
-  //   }
-  // }
-  // bool checkHit(T val)
-  // {
-  //   /* if(_type == Type.SINGLE){ */
-  //   /*     return (val == _single); */
-  //   /* } */
-  //   ulong len = _ranges.length;
-  //   if (val < _ranges[0]._min)
-  //     return false;
-  //   if (val > _ranges[$ - 1]._max)
-  //     return false;
-  //   ulong left = 0, right = len - 1;
-  //   while (left <= right)
-  //     {
-  // 	ulong mid = (right + left) / 2;
-  // 	if (val >= _ranges[mid]._min && val <= _ranges[mid]._max)
-  // 	  return true;
-  // 	if (val < _ranges[mid]._min)
-  // 	  right = mid - 1;
-  // 	else if (val > _ranges[mid]._max)
-  // 	  left = mid + 1;
-  //     }
-  //   return false;
-  // }
 }
-
-// interface:  
 
 interface coverInterface {
   void sample ();
@@ -1105,46 +920,6 @@ string sampleCoverpoints(int n){
   return s;
 }
 
-
-// struct Cross ( N... ){
-//   coverInterface innerClass;
-//   void Initialize(){
-//     if(innerClass is null)
-//       innerClass = new CrossClass!( N )();
-//   }
-//   void sample(){
-//     Initialize();
-//     innerClass.sample();
-//   }
-//   double get_coverage(){
-//     Initialize();
-//     return innerClass.get_coverage();
-//   }
-//   double get_inst_coverage(){
-//     Initialize();
-//     return innerClass.get_inst_coverage();
-//   }
-//   void start(){
-//     Initialize();
-//     innerClass.start();
-//   }
-//   void stop(){
-//     Initialize();
-//     innerClass.stop();
-//   }
-//   auto get_cross_inst_hits(){
-//     Initialize();
-//     return (cast(CrossClass!(N))(innerClass)).get_cross_inst_hits();
-//   }
-//   size_t get_weight(){
-//     Initialize();
-//     return innerClass.get_weight();
-//   }
-//   bool isCross(){
-//     return true;
-//   }
-// }
-
 class Cross ( N... ): coverInterface{
   import std.traits: isIntegral;
   enum size_t len = N.length;
@@ -1201,44 +976,6 @@ class Cross ( N... ): coverInterface{
   }
 }
 
-
-// struct CoverPoint (string BINS="", T){
-//   coverInterface innerClass;
-//   this (ref T t){
-//     innerClass = new CoverPointClass!(BINS)(t);
-//   }
-//   auto getBins() {
-//     return (cast(CoverPointClass!(t, BINS))(innerClass)).getBins();
-//   }
-//   string describe(){
-//     return (cast(CoverPointClass!(t, BINS))(innerClass)).describe();
-//   }
-//   void sample(){
-//     innerClass.sample();
-//   }
-//   double get_coverage(){
-//     return innerClass.get_coverage();
-//   }
-//   double get_inst_coverage(){
-//     return innerClass.get_inst_coverage();
-//   }
-//   void start(){
-//     innerClass.start();
-//   }
-//   void stop(){
-//     innerClass.stop();
-//   }
-//   bool [] get_inst_hits(){
-//     return innerClass.get_inst_hits();
-//   }
-//   size_t get_weight(){
-//     return innerClass.get_weight();
-//   }
-//   bool isCross(){
-//     return false;
-//   }
-// }
-
 struct Parameters {
   size_t weight = 1;
   size_t goal = 90;
@@ -1255,12 +992,6 @@ struct StaticParameters {
 
 class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   import std.traits: isIntegral;
-  // import esdl.data.bvec: isBitVector;
-  // static assert(isIntegral!T || isBitVector!T || is(T: bool),
-  //     "Only integral, bitvec, or bool values can be covered."
-  //     ~ " Unable to cover a value of type: " ~ T.stringof);
-  // T* _point; // = &t;
-  //char[] outBuffer;
   alias T = typeof(t);
   string outBuffer;
   bool [] _inst_hits;
@@ -1271,7 +1002,6 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   static StaticParameters type_option;
   this (){
 
-    // import std.stdio;
     static if (BINS != ""){
       mixin(doParse!T(BINS));
     }
@@ -1279,20 +1009,16 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
       import std.conv;
       mixin(doParse!T("bins [64] a = {[" ~ T.min.to!string() ~ ":" ~ T.max.to!string() ~ "]};"));
     }
-    // writeln(doParse!T(BINS));
 
     procDyanamicBins(_bins,_dbins);
-    // procDyanamicBins(_ig_bins,_ig_dbins);
     procDyanamicBins(_ill_bins,_ill_dbins);
     procStaticBins(_bins,_sbins,_sbinsNum);
-    // procStaticBins(_ig_bins,_ig_sbins,_ig_sbinsNum);
     procStaticBins(_ill_bins,_ill_sbins,_ill_sbinsNum);
     procIgnoreBins();
     _inst_hits.length = _bins.length; 
     _inst_wild_hits.length = _wildbins.length;
   }
-  // the number of bins and which one is hit is made out by the
-  // sample function
+  
   size_t [] _sbinsNum;
   size_t [] _ig_sbinsNum;
   size_t [] _ill_sbinsNum;
@@ -1300,54 +1026,22 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   Bin!(T)[] _sbins;
   Bin!(T)[] _dbins;
   Bin!(T)[] _ig_bins;
-  // Bin!(T)[] _ig_sbins;
-  // Bin!(T)[] _ig_dbins;
   Bin!(T)[] _ill_bins;
   Bin!(T)[] _ill_sbins;
   Bin!(T)[] _ill_dbins;
   WildCardBin!(T)[] _wildbins;
+  WildCardBin!(T)[] _ig_wildbins;
+  WildCardBin!(T)[] _ill_wildbins;
   uint _defaultCount;
-  // We keep a count of how many times a bin is hit
-  int _pos;	     // position of t the covergoup; -1 otherwise
-  // void _initPoint(G)(G g) {
-  //   auto _outer = g.outer;
-  //   assert (_outer !is null);
-  //   static if (__traits(hasMember, g, t.stringof)) {
-  //     _point = &(__traits(getMember, g, t.stringof));
-  //     assert(_point !is null);
-  //   }
-  //   else static if (__traits(hasMember, g.outer, t.stringof)) {
-  //     _point = &(__traits(getMember, _outer, t.stringof));
-  //     assert(_point !is null);
-  //   }
-  //   else {
-  //     _point = &(t);
-  //     assert(_point !is null);
-  //   }
-  //   static if (isIntegral!T) {
-  //     _bins.length = 64;
-  //   }
-  //   else static if (is(T == bool)) {
-  //     _bins.length = 2;
-  //   }
-  //   else {
-  //     static if (T.SIZE > 6) {
-  //       _bins.length = 64;
-  //     }
-  //     else {
-  //       _bins.length = T.max - T.min;
-  //     }
-  //   }
-  // }
-
+  
+  int _pos;
 
   auto getBins() {
     return _bins;
   }
 
-  // import std.stdio;
-
   import std.conv;
+  
   void procIgnoreBins(){
     if (_ig_bins.length == 0){
       return;
@@ -1430,6 +1124,16 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   }
   override void sample(){
     // writeln("sampleCalled");
+    foreach (i, ref ill_wbin; _ill_wildbins){
+      if (ill_wbin.checkHit(t)){
+	assert(false, "illegal bin hit");
+      }
+    }
+    foreach (i, ref ill_bin; _ill_bins){
+      if (ill_bin.checkHit(t)){
+	assert(false, "illegal bin hit");
+      }
+    }
     _num_inst_hits = 0;
     foreach(i, ref bin;_bins){
       _inst_hits[i] = false;
@@ -1441,7 +1145,12 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
         _inst_hits[i] = true;
         _num_inst_hits ++;
       }
-    } 
+    }
+    foreach (i, ref ig_wbin; _ig_wildbins){
+      if (ig_wbin.checkHit(t)){
+	return;
+      }
+    }
     foreach(i, ref wbin; _wildbins){
       _inst_wild_hits[i] = false;
       if(wbin.checkHit(t)){
@@ -1477,150 +1186,6 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   }
 }
 
-/*class CoverGroup: rand.disable {		// Base Class
-  bool _isInitialized;		// true if the CoverGroup has been initialized
-  }*/
-
-// private void initialize(G, int I=0)(G g) if (is(G: CoverGroup)) {
-//   static if (I == 0) {
-//     if (g._isInitialized) return;
-//     else g._isInitialized = true;
-//   }
-//   static if (I >= G.tupleof.length) {
-//     return;
-//   }
-//   else {
-//     alias E = typeof(g.tupleof[I]);
-//     static if (is (E: CoverPointClass!(t, S), alias t, string S)) {
-//       g.tupleof[I]._initPoint(g);
-//       int index = findElementIndex!(t.stringof, G);
-//       g.tupleof[I]._initPos(index);
-//     }
-//     initialize!(G, I+1)(g);
-//   }
-// }
-
-// private void samplePoints(int I, int N, G)(G g) if (is(G: CoverGroup)) {
-//   static if (I >= G.tupleof.length) {
-//     return;
-//   }
-//   else {
-//     alias E = typeof(g.tupleof[I]);
-//     static if (is (E: CoverPointClass!(t, S), alias t, string S)) {
-//       g.tupleof[I].sample(N);
-//     }
-//     samplePoints!(I+1, N)(g);
-//   }
-// }
-
-
-// public void sample(G, V...)(G g, V v) if (is(G: CoverGroup)) {
-//   // navigate through the class elements of G to know the CoverPointClass
-//   // instantiations as well as any Integral/BitVector instances
-//   sampleArgs!(0)(g, v);
-//   initialize(g);
-//   // Now look for all the coverpoints
-//   samplePoints!(0, V.length)(g);
-// }
-
-// private void sampleArgs(int I, G, V...)(G g, V v) {
-//   import std.traits: isAssignable;
-//   static if (V.length == 0) {
-//     return;
-//   }
-//   else {
-//     alias VAL_TUPLE = getIntElements!G;
-//     alias N = VAL_TUPLE[I];
-//     static assert (isAssignable!(typeof(G.tupleof[N]), V[0]),
-//         "Method sample called with argument of type " ~
-//         V[0].stringof ~ " at position " ~ I.stringof ~
-//         " is not assignable to type " ~
-//         typeof(G.tupleof[N]).stringof);
-//     static if (I == 0) {
-//       static assert (VAL_TUPLE.length >= V.length,
-//           "Method sample called with " ~ V.length.stringof ~
-//           " arguments, while it can take only " ~
-//           VAL_TUPLE.length.stringof ~
-//           " arguments for covergroup of type: " ~ G.stringof);
-//     }
-//     g.tupleof[N] = v[0];
-//     sampleArgs!(I+1)(g, v[1..$]);
-//   }
-// }
-
-// // return a tuple of integral elements
-// private template getIntElements(G, int N=0, I...) {
-//   import std.traits: isIntegral;
-//   import esdl.data.bvec: isBitVector;
-//   static if (N == G.tupleof.length) {
-//     enum getIntElements = I;
-//   }
-//   else {
-//     alias T = typeof(G.tupleof[N]);
-//     static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-//       enum getIntElements = getIntElements!(G, N+1, I, N);
-//     }
-//     else {
-//       enum getIntElements = getIntElements!(G, N+1, I);
-//     }
-//   }
-// }
-
-// private template findElementIndex(string E, G, int I=0, int N=0) {
-//   import std.traits: isIntegral;
-//   import esdl.data.bvec: isBitVector;
-//   static if(I >= G.tupleof.length) {
-//     enum findElementIndex = -1;
-//   } else {
-//     alias T = typeof(G.tupleof[I]);
-//     static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-//       static if (E == G.tupleof[I].stringof) {
-//         enum findElementIndex = N;
-//       }
-//       else {
-//         enum findElementIndex =  findElementIndex!(E, G, I+1, N+1);
-//       }
-//     }
-//     else {
-//       enum findElementIndex = findElementIndex!(E, G, I+1, N);
-//     }
-//   }
-// }
-
-// private template nthIntElement(alias g, int N, int I=0) {
-//   import std.traits: isIntegral;
-//   import esdl.data.bvec: isBitVector;
-//   static assert(I < g.tupleof.length);
-//   alias T = typeof(g.tupleof[I]);
-//   static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-//     static if (N == 0) {
-//       enum nthIntElement = g.tupleof[I];
-//     }
-//     else {
-//       enum nthIntElement = nthIntElement!(g, N-1, I+1);
-//     }
-//   }
-//   else {
-//     enum nthIntElement = nthIntElement!(g, N, I+1);
-//   }
-// }
-
-// private template countIntElements(G, int COUNT=0, int I=0) {
-//   import std.traits: isIntegral;
-//   import esdl.data.bvec: isBitVector;
-//   static if (I != G.tupleof.length) {
-//     alias T = typeof(G.tupleof[I]);
-//     static if (isBitVector!T || isIntegral!T || is(T == bool)) {
-//       enum countIntElements = countIntElements!(G, COUNT+1, I+1);
-//     }
-//     else {
-//       enum countIntElements = countIntElements!(G, COUNT, I+1);
-//     }
-//   }
-//   else {
-//     enum countIntElements = COUNT;
-//   }
-// }
 void main (){
 }
 unittest {
@@ -1628,28 +1193,10 @@ unittest {
   auto x = new CoverPoint!(p, q{
       bins a = {     1 , 2 }  ;
 
-      })();
+    })();
   import std.stdio;
   writeln(x.describe()); 
-  //x.print();
-  //import std.stdio;
-  //writeln(x.describe());
 }
-// unittest {
-//   int p;
-//   auto x = new CoverPointClass!(q{
-//       bins a = { [0:63],65 };
-//       bins [] b = { [127:130],[137:147],200,[100:108] }; // note overlapping values
-//       bins [3]c = { 200,201,202,204 };
-//       bins d = { [1000:$] };
-//       bins e = { 125 };
-//       //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
-//     })(p);
-//   import std.stdio;
-//   /* writeln(x.describe()); */
-//   //import std.stdio;
-//   //writeln(x.describe());
-// }
 unittest {
   int p;
   auto x = new CoverPoint!(p, q{
@@ -1660,26 +1207,15 @@ unittest {
       bins e = { 125 };
       ignore_bins []a = { 5 , [20:30] };
       ignore_bins [3]b = { [100:104] };
-      //bins [] others = { 1927, 1298 , 2137, [12: 1000]};
-      })();
+    })();
   import std.stdio;
   writeln(x.describe()); 
-  //import std.stdio;
-  //writeln(x.describe());
 }
-// unittest {
-//   int p;
-//   auto x = new CoverPointClass!(q{
-//       bins [32] a = {[-2147483648:2147483647]};
-//     })(p);
-//   import std.stdio;
-//   writeln(x.describe());
-// }
 unittest {
   int p;
   auto x = new CoverPoint!(p, q{
       bins [32] a = {[-2147483647:2147483647]};
-      })();
+    })();
   import std.stdio;
   writeln(x.describe());
 }
@@ -1691,12 +1227,10 @@ unittest{
     })();
   auto cp2 = new CoverPoint!(a, q{
       bins [] cp2 = {4,5};
-      })();
+    })();
   auto x = new Cross!(cp, cp2)();
   import std.stdio;
   writeln(cp.option.weight);
-  /* writeln(cp.describe()); */
-  /* writeln(cp2.describe()); */
   cp.sample();
   cp2.sample();
   x.sample();
@@ -1718,59 +1252,25 @@ unittest{
   assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
   // sampling works
 }
-// unittest{
-//   int a = 5, d = 3;
-//   auto cp = CoverPoint!(d,q{
-//       bins [2] a = {2,3};
-//     })();
-//   auto cp2 = CoverPoint!(a,q{
-//       bins [] cp2 = {4,5};
-//     })();
-//   auto x = new CrossClass!(cp,cp2)();
-//   /* writeln(cp.describe()); */
-//   /* writeln(cp2.describe()); */
-//   cp.sample();
-//   cp2.sample();
-//   x.sample();
-//   auto tmp = x.get_cross_inst_hits();
-//   assert(tmp[1][1] && !tmp[0][0] && !tmp[0][1] && !tmp[1][0]);
-
-//   a = 4;
-//   cp.sample();
-//   cp2.sample();
-//   x.sample();
-//   tmp = x.get_cross_inst_hits();
-//   assert(tmp[1][0] && !tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
-
-//   d = 2;
-//   cp.sample();
-//   cp2.sample();
-//   x.sample();
-//   tmp = x.get_cross_inst_hits();
-//   assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
-//   // sampling works
-// }
 
 unittest{
   int a = 1, b = 2;
   auto x = new CoverPoint!(a, q{
       bins x1 = {1,2,3};
       bins x2 = {1};
-      })();
+    })();
 
 
   auto xb = new Cross!(x,b)();
   x.sample();
   xb.sample();
-  // bug in default bin generation 
-  /* assert(); */
 }
 unittest {
   int a = 13;
   auto x = new CoverPoint!(a, q{
       bins a = {1 , 4 , $0}  ;
       wildcard bins abx = { 4ab11?? };
-      }, 3)();
+    }, 3)();
   import std.stdio;
   for(int i = 12; i < 16; i++){
     a = i;
@@ -1779,14 +1279,4 @@ unittest {
   }
   writeln(x.describe());
 }
-
-// unittest {
-//   Bin!int a = Bin!int();
-//   a.addRange(1, 10);
-//   a.addRange(15, 20);
-//   import std.stdio;
-//   writeln(a.describe(), " ", a.count());
-//   a.addRange(11, 14);
-//   writeln(a.describe());
-// }
 
