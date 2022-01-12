@@ -49,15 +49,15 @@ double get_coverage (T)(T grp) if (is(T: CoverGroup)){
   }
   return total/weightSum;
  }
-double get_inst_coverage (T)(T grp) if (is(T: CoverGroup)){
-  double total = 0;
-  size_t weightSum = 0;
-  foreach (ref elem; grp.tupleof){
-    total += elem.get_inst_coverage()*elem.get_weight();
-    weightSum += elem.get_weight();
-  }
-  return total/weightSum;
- }
+// double get_curr_coverage (T)(T grp) if (is(T: CoverGroup)){
+//   double total = 0;
+//   size_t weightSum = 0;
+//   foreach (ref elem; grp.tupleof){
+//     total += elem.get_curr_coverage()*elem.get_weight();
+//     weightSum += elem.get_weight();
+//   }
+//   return total/weightSum;
+//  }
 void start (T)(T grp) if (is(T: CoverGroup)){
   foreach (ref elem; grp.tupleof){
     elem.start();
@@ -328,6 +328,45 @@ struct parser (T){
       return start;
     }
   }
+  size_t parseNestedComment() {
+    size_t nesting = 0;
+    size_t start = srcCursor;
+    if (srcCursor >= BINS.length - 2 ||
+        BINS[srcCursor] != '/' || BINS[srcCursor+1] != '+') return start;
+    else {
+      srcCursor += 2;
+      while (srcCursor < BINS.length - 1) {
+        if (BINS[srcCursor] == '/' && BINS[srcCursor+1] == '+') {
+          nesting += 1;
+          srcCursor += 1;
+        }
+        else if (BINS[srcCursor] == '+' && BINS[srcCursor+1] == '/') {
+          if (nesting == 0) {
+            break;
+          }
+          else {
+            nesting -= 1;
+            srcCursor += 1;
+          }
+        }
+        srcCursor += 1;
+        if (srcCursor >= BINS.length - 1) {
+          // commment unterminated
+          assert (false, "Block comment not terminated at line "~ srcLine.to!string);
+        }
+      }
+      srcCursor += 2;
+      return start;
+    }
+  }
+  bool isDefault(){
+    if (srcCursor + 7 < BINS.length && BINS[srcCursor .. srcCursor+7] == "default"){
+      srcCursor += 7;
+      parseSpace();
+      return true;
+    }
+    return false;
+  }
   void parseBin(string BinType){
     size_t srcTag;
     while(true){
@@ -392,38 +431,6 @@ struct parser (T){
       }
       parseComma();
     }
-
-  }
-  size_t parseNestedComment() {
-    size_t nesting = 0;
-    size_t start = srcCursor;
-    if (srcCursor >= BINS.length - 2 ||
-        BINS[srcCursor] != '/' || BINS[srcCursor+1] != '+') return start;
-    else {
-      srcCursor += 2;
-      while (srcCursor < BINS.length - 1) {
-        if (BINS[srcCursor] == '/' && BINS[srcCursor+1] == '+') {
-          nesting += 1;
-          srcCursor += 1;
-        }
-        else if (BINS[srcCursor] == '+' && BINS[srcCursor+1] == '/') {
-          if (nesting == 0) {
-            break;
-          }
-          else {
-            nesting -= 1;
-            srcCursor += 1;
-          }
-        }
-        srcCursor += 1;
-        if (srcCursor >= BINS.length - 1) {
-          // commment unterminated
-          assert (false, "Block comment not terminated at line "~ srcLine.to!string);
-        }
-      }
-      srcCursor += 2;
-      return start;
-    }
   }
 
   void parseBinOfType(string type){
@@ -434,10 +441,29 @@ struct parser (T){
       parseSpace();
       parseEqual();
       parseSpace();
-      parseCurlyOpen();
-      parseSpace();
-      fill(type ~ "_bins ~= Bin!T( \"" ~ name ~ "\");\n");
-      parseBin(type ~ "_bins");
+      if (isDefault()){
+	if (type == "_ig"){
+	  fill("_default = DefaultBin(Type.IGNORE, \"" ~ name ~ "\");");
+	}
+	else if (type == "_ill"){
+	  fill("_default = DefaultBin(Type.ILLEGAL, \"" ~ name ~ "\");");
+	}
+	else {
+	  fill("_default = DefaultBin(Type.BIN, \"" ~ name ~ "\");");
+	}
+	if (BINS[srcCursor] != ';'){
+	  assert(false, "';' expected, not found at line " ~ srcLine.to!string);
+	}
+	++srcCursor;
+	parseSpace();
+	return;
+      }
+      else {
+	fill(type ~ "_bins ~= Bin!T( \"" ~ name ~ "\");\n");
+	parseCurlyOpen();
+	parseSpace();
+	parseBin(type ~ "_bins");
+      }
     }
     else if(bintype == BinType.DYNAMIC) {
       parseSpace();
@@ -616,7 +642,6 @@ struct WildCardBin(T){
     else 
       return false;
   }
-
 }
 
 struct Bin(T)
@@ -864,18 +889,28 @@ struct Bin(T)
     return c;
   }
 }
+enum Type: ubyte {IGNORE, ILLEGAL, BIN};
+struct DefaultBin {
+  Type _type = Type.IGNORE;
+  bool _curr_hit;
+  string _name = "";
+  uint _hits = 0;
+  this (Type t, string n){
+    _type = t;
+    _name = n;
+  }
+}
 
 interface coverInterface {
   void sample ();
   double get_coverage();
-  double get_inst_coverage();
+  double get_curr_coverage();
   void start();
   void stop();
-  bool [] get_inst_hits();
+  bool [] get_curr_hits();
   size_t get_weight();
   bool isCross();
   //double query();
-  //double inst_query();
 }
 
 // cross stuff: 
@@ -891,12 +926,12 @@ string makeArray(size_t len, string type,string name){
 
 string crossSampleHelper(int n){
   import std.conv;
-  string s = "bool [][] inst_hits_arr;\n";
+  string s = "bool [][] curr_hits_arr;\n";
   for(int i = 0; i < n; i++){
-    s ~= "inst_hits_arr ~= coverPoints[" ~ i.to!string() ~ "].get_inst_hits();\n";
+    s ~= "curr_hits_arr ~= coverPoints[" ~ i.to!string() ~ "].get_curr_hits();\n";
   }
   for(int i = 0; i < n; i++){
-    s ~= "foreach(i_" ~ i.to!string() ~ ", is_hit_" ~ i.to!string() ~ "; inst_hits_arr[" ~ i.to!string() ~ "]){\n";
+    s ~= "foreach(i_" ~ i.to!string() ~ ", is_hit_" ~ i.to!string() ~ "; curr_hits_arr[" ~ i.to!string() ~ "]){\n";
     s ~= "if(!is_hit_" ~ i.to!string() ~ ")\ncontinue;\n";
   }
   s ~= "_hits";
@@ -904,7 +939,7 @@ string crossSampleHelper(int n){
     s ~= "[i_" ~ i.to!string() ~ "]"; 
   }
   s ~= "++;\n";
-  s ~= "_inst_hits";
+  s ~= "_curr_hits";
   for(int i = 0; i < n; i++){
     s ~= "[i_" ~ i.to!string() ~ "]"; 
   }
@@ -946,7 +981,7 @@ class Cross ( N... ): coverInterface{
   enum size_t len = N.length;
   ulong [] bincnts;
   mixin(makeArray(len, "uint", "_hits"));
-  mixin(makeArray(len, "bool", "_inst_hits"));
+  mixin(makeArray(len, "bool", "_curr_hits"));
   coverInterface [] coverPoints;
   this (){
     foreach (i , ref elem; N){
@@ -962,10 +997,10 @@ class Cross ( N... ): coverInterface{
       }
     }
     mixin(arrayInitialising("_hits", len));
-    mixin(arrayInitialising("_inst_hits", len));
+    mixin(arrayInitialising("_curr_hits", len));
   }
   override void sample(){
-    mixin(arrayInitialising("_inst_hits", len));
+    mixin(arrayInitialising("_curr_hits", len));
     mixin(sampleCoverpoints(len));
     mixin(crossSampleHelper(N.length));
   }
@@ -973,7 +1008,7 @@ class Cross ( N... ): coverInterface{
     return 0;
 
   }
-  override double get_inst_coverage(){
+  override double get_curr_coverage(){
     return 0;
 
   }
@@ -983,11 +1018,11 @@ class Cross ( N... ): coverInterface{
   override void stop(){
 
   }
-  override bool [] get_inst_hits(){
+  override bool [] get_curr_hits(){
     assert(false);
   }
-  auto get_cross_inst_hits(){
-    return _inst_hits;
+  auto get_cross_curr_hits(){
+    return _curr_hits;
   }
   override size_t get_weight(){
     return 1;
@@ -1008,34 +1043,39 @@ struct StaticParameters {
   size_t weight = 1;
   size_t goal = 90;
 }
-
 class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   import std.traits: isIntegral;
   alias T = typeof(t);
   string outBuffer;
-  bool [] _inst_hits;
-  bool [] _inst_wild_hits;
+  bool [] _curr_hits;
+  bool [] _curr_wild_hits;
   size_t _num_hits;
-  size_t _num_inst_hits;
+  size_t _num_curr_hits;
   Parameters option;
+  
   static StaticParameters type_option;
   this (){
 
-    static if (BINS != ""){
-      mixin(doParse!T(BINS));
-    }
-    else {
-      import std.conv;
-      mixin(doParse!T("bins [64] a = {[" ~ T.min.to!string() ~ ":" ~ T.max.to!string() ~ "]};"));
-    }
+    // static if (BINS != ""){
+    mixin(doParse!T(BINS));
+    // }
+    // else {
+    //   import std.conv;
+    //   mixin(doParse!T("bins [64] a = {[" ~ T.min.to!string() ~ ":" ~ T.max.to!string() ~ "]};"));
+    // }
 
     procDyanamicBins(_bins,_dbins);
     procDyanamicBins(_ill_bins,_ill_dbins);
     procStaticBins(_bins,_sbins,_sbinsNum);
     procStaticBins(_ill_bins,_ill_sbins,_ill_sbinsNum);
     procIgnoreBins();
-    _inst_hits.length = _bins.length; 
-    _inst_wild_hits.length = _wildbins.length;
+    _curr_hits.length = _bins.length; 
+    _curr_wild_hits.length = _wildbins.length;
+    if (_bins.length == 0 && _ill_bins.length == 0){
+      mixin(doParse!T("bins [64] a = {[" ~ T.min.to!string() ~ ":" ~ T.max.to!string() ~ "]};"));
+      procStaticBins(_bins,_sbins,_sbinsNum);
+      _curr_hits.length = _bins.length; 
+    }
   }
   
   size_t [] _sbinsNum;
@@ -1051,6 +1091,7 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   WildCardBin!(T)[] _wildbins;
   WildCardBin!(T)[] _ig_wildbins;
   WildCardBin!(T)[] _ill_wildbins;
+  DefaultBin _default;
   uint _defaultCount;
   
   int _pos;
@@ -1143,6 +1184,7 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   }
   override void sample(){
     // writeln("sampleCalled");
+    bool hasHit = false;
     foreach (i, ref ill_wbin; _ill_wildbins){
       if (ill_wbin.checkHit(t)){
 	assert(false, "illegal bin hit");
@@ -1153,16 +1195,17 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
 	assert(false, "illegal bin hit");
       }
     }
-    _num_inst_hits = 0;
+    _num_curr_hits = 0;
     foreach(i, ref bin;_bins){
-      _inst_hits[i] = false;
+      _curr_hits[i] = false;
       if(bin.checkHit(t)){
         if (bin._hits == 0){
           _num_hits ++;
         }
+	hasHit = true;
         bin._hits++;
-        _inst_hits[i] = true;
-        _num_inst_hits ++;
+        _curr_hits[i] = true;
+        _num_curr_hits ++;
       }
     }
     foreach (i, ref ig_wbin; _ig_wildbins){
@@ -1171,22 +1214,33 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
       }
     }
     foreach(i, ref wbin; _wildbins){
-      _inst_wild_hits[i] = false;
+      _curr_wild_hits[i] = false;
       if(wbin.checkHit(t)){
         if(wbin._hits == 0){
           _num_hits++;
         }
+	hasHit = true;
         wbin._hits++;
-        _inst_wild_hits[i] = true;
-        _num_inst_hits++;
+        _curr_wild_hits[i] = true;
+        _num_curr_hits++;
+      }
+    }
+    if (!hasHit){      
+      _default._curr_hit = false      ;
+      if (_default._type == Type.ILLEGAL){
+	assert(false, "illegal bin hit");
+      }
+      else if (_default._type == Type.BIN){
+	_default._curr_hit = true;
+	_default._hits ++;
       }
     }
   }
   override double get_coverage(){
     return cast(double)(_num_hits)/_bins.length;
   }
-  override double get_inst_coverage(){
-    return cast(double)(_num_inst_hits)/_bins.length;
+  override double get_curr_coverage(){
+    return cast(double)(_num_curr_hits)/_bins.length;
   }
   override void start(){
 
@@ -1194,8 +1248,8 @@ class CoverPoint(alias t, string BINS="", N...) : coverInterface{
   override void stop(){
 
   }
-  override bool [] get_inst_hits(){
-    return _inst_hits;
+  override bool [] get_curr_hits(){
+    return _curr_hits;
   }
   override size_t get_weight(){
     return 1;
@@ -1253,21 +1307,21 @@ unittest{
   cp.sample();
   cp2.sample();
   x.sample();
-  auto tmp = x.get_cross_inst_hits();
+  auto tmp = x.get_cross_curr_hits();
   assert(tmp[1][1] && !tmp[0][0] && !tmp[0][1] && !tmp[1][0]);
 
   a = 4;
   cp.sample();
   cp2.sample();
   x.sample();
-  tmp = x.get_cross_inst_hits();
+  tmp = x.get_cross_curr_hits();
   assert(tmp[1][0] && !tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
 
   d = 2;
   cp.sample();
   cp2.sample();
   x.sample();
-  tmp = x.get_cross_inst_hits();
+  tmp = x.get_cross_curr_hits();
   assert(!tmp[1][0] && tmp[0][0] && !tmp[0][1] && !tmp[1][1]);
   // sampling works
 }
@@ -1277,6 +1331,7 @@ unittest{
   auto x = new CoverPoint!(a, q{
       bins x1 = {1,2,3};
       bins x2 = {1};
+      bins x3 = default;
     })();
 
 
@@ -1294,7 +1349,7 @@ unittest {
   for(int i = 12; i < 16; i++){
     a = i;
     x.sample();
-    assert(x._inst_wild_hits[0]);
+    assert(x._curr_wild_hits[0]);
   }
   writeln(x.describe());
 }
